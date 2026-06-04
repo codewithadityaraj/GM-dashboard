@@ -16,6 +16,7 @@
   <!-- ==========================================
        LOGIN SCREEN
        ========================================== -->
+  <!--
   <div class="login-overlay" id="login-overlay">
     <div class="login-card">
       <div class="login-logo">
@@ -56,11 +57,12 @@
       </div>
     </div>
   </div>
+  -->
 
   <!-- ==========================================
        MAIN DASHBOARD (shown after login)
        ========================================== -->
-  <div class="app-layout" id="app-layout" style="display:none;">
+  <div class="app-layout" id="app-layout" style="display:grid;">
 
     <!-- LEFT SIDEBAR -->
     <aside class="sidebar" id="sidebar">
@@ -159,6 +161,16 @@
 
         <div class="nav-right">
           <div class="filters-row">
+
+            <!-- GM Filter -->
+            <div class="filter-group">
+              <label class="filter-label">GM</label>
+              <select class="filter-select" id="filter-gm" onchange="applyFilters()">
+                <option value="ALL">All GMs</option>
+                <option value="umang">Umang</option>
+                <option value="siddharth">Siddharth</option>
+              </select>
+            </div>
 
             <!-- Program Filter -->
             <div class="filter-group">

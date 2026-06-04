@@ -53,6 +53,7 @@ let currentUser = null;   // set on login
 let activeView = 'overview';
 
 let activeFilters = {
+  gm: 'ALL',
   program: 'ALL',
   tl: 'ALL',
   bde: 'ALL',
@@ -186,7 +187,15 @@ function fNum(n) { return n.toLocaleString('en-IN'); }
 // ==========================================
 // Returns TLs for current user — filtered by active program if set
 function getMyTLs() {
-  const allTLs = currentUser ? USERS[currentUser].tls : [];
+  let allTLs = [];
+  if (activeFilters.gm === 'ALL') {
+    Object.keys(USERS).forEach(username => {
+      allTLs = allTLs.concat(USERS[username].tls);
+    });
+  } else {
+    const gm = activeFilters.gm || currentUser || 'umang';
+    allTLs = USERS[gm] ? USERS[gm].tls : [];
+  }
   if (activeFilters.program !== 'ALL') {
     return allTLs.filter(tl => tl.program === activeFilters.program);
   }
@@ -250,32 +259,38 @@ function handleLogout() {
   });
 
   currentUser = null;
-  activeFilters = { program: 'ALL', tl: 'ALL', bde: 'ALL', dateFrom: '2026-05-01', dateTo: '2026-05-28' };
+  activeFilters = { gm: 'ALL', program: 'ALL', tl: 'ALL', bde: 'ALL', dateFrom: '2026-05-01', dateTo: '2026-05-28' };
 
   document.getElementById('app-layout').style.display = 'none';
-  document.getElementById('login-overlay').style.display = 'flex';
-  document.getElementById('login-username').value = '';
-  document.getElementById('login-password').value = '';
-  document.getElementById('login-error').classList.remove('show');
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    document.getElementById('login-username').value = '';
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-error').classList.remove('show');
+  }
 }
 
 // ==========================================
 // DASHBOARD INIT (after login)
 // ==========================================
 function initDashboard() {
-  const user = USERS[currentUser];
+  const user = USERS[currentUser] || { displayName: 'Umang' };
 
   // Set GM name label in top navbar
-  document.getElementById('gm-dashboard-label').textContent = user.displayName + "'s Dashboard";
+  const currentGMName = activeFilters.gm === 'ALL' ? 'All GMs' : (USERS[activeFilters.gm]?.displayName || user.displayName);
+  document.getElementById('gm-dashboard-label').textContent = currentGMName + "'s Dashboard";
 
   // Sidebar user info
-  document.getElementById('sidebar-avatar').textContent = user.displayName.charAt(0).toUpperCase();
-  document.getElementById('sidebar-username').textContent = user.displayName;
+  document.getElementById('sidebar-avatar').textContent = currentGMName.charAt(0).toUpperCase();
+  document.getElementById('sidebar-username').textContent = currentGMName;
 
   // Populate sidebar team list
   const teamList = document.getElementById('sidebar-team-list');
   teamList.innerHTML = '';
-  user.tls.forEach(tl => {
+  
+  const tls = getMyTLs();
+  tls.forEach(tl => {
     const block = document.createElement('div');
     block.className = 'team-tl-block';
     block.innerHTML = `
@@ -292,9 +307,14 @@ function initDashboard() {
   });
 
   // Reset all filters for clean state
+  activeFilters.gm = 'ALL';
   activeFilters.program = 'ALL';
   activeFilters.tl = 'ALL';
   activeFilters.bde = 'ALL';
+
+  if (document.getElementById('filter-gm')) {
+    document.getElementById('filter-gm').value = activeFilters.gm;
+  }
 
   // Populate Program filter (all programs this GM manages)
   populateProgramFilter();
@@ -315,13 +335,24 @@ function initDashboard() {
 
 // Populate Program filter for logged-in GM
 function populateProgramFilter() {
-  const user = USERS[currentUser];
   const progSelect = document.getElementById('filter-program');
   progSelect.innerHTML = '<option value="ALL">All Programs</option>';
-  user.tls.forEach(tl => {
+  
+  let tls = [];
+  if (activeFilters.gm === 'ALL') {
+    Object.keys(USERS).forEach(username => {
+      tls = tls.concat(USERS[username].tls);
+    });
+  } else {
+    const gm = activeFilters.gm || currentUser || 'umang';
+    tls = USERS[gm] ? USERS[gm].tls : [];
+  }
+  
+  const uniquePrograms = [...new Set(tls.map(tl => tl.program))];
+  uniquePrograms.forEach(prog => {
     const opt = document.createElement('option');
-    opt.value = tl.program;
-    opt.textContent = tl.program;
+    opt.value = prog;
+    opt.textContent = prog;
     progSelect.appendChild(opt);
   });
   progSelect.value = activeFilters.program;
@@ -329,12 +360,22 @@ function populateProgramFilter() {
 
 // Populate TL filter — scoped to selected program
 function populateTLFilter() {
-  const user = USERS[currentUser];
   const tlSelect = document.getElementById('filter-tl');
   tlSelect.innerHTML = '<option value="ALL">All TLs</option>';
+  
+  let tls = [];
+  if (activeFilters.gm === 'ALL') {
+    Object.keys(USERS).forEach(username => {
+      tls = tls.concat(USERS[username].tls);
+    });
+  } else {
+    const gm = activeFilters.gm || currentUser || 'umang';
+    tls = USERS[gm] ? USERS[gm].tls : [];
+  }
+
   const scopedTLs = activeFilters.program === 'ALL'
-    ? user.tls
-    : user.tls.filter(tl => tl.program === activeFilters.program);
+    ? tls
+    : tls.filter(tl => tl.program === activeFilters.program);
   scopedTLs.forEach(tl => {
     const opt = document.createElement('option');
     opt.value = tl.name;
@@ -362,17 +403,68 @@ function populateBDEFilter(tlName) {
 // FILTER APPLY — cascades: Program → TL → BDE
 // ==========================================
 function applyFilters() {
+  const prevGM      = activeFilters.gm;
   const prevProgram = activeFilters.program;
   const prevTL      = activeFilters.tl;
 
+  if (document.getElementById('filter-gm')) {
+    activeFilters.gm = document.getElementById('filter-gm').value;
+  }
   activeFilters.program  = document.getElementById('filter-program').value;
   activeFilters.tl       = document.getElementById('filter-tl').value;
   activeFilters.bde      = document.getElementById('filter-bde').value;
   activeFilters.dateFrom = document.getElementById('date-from').value;
   activeFilters.dateTo   = document.getElementById('date-to').value;
 
+  // GM changed → reset Program, TL & BDE, repopulate all dropdowns
+  if (activeFilters.gm !== prevGM) {
+    activeFilters.program = 'ALL';
+    activeFilters.tl      = 'ALL';
+    activeFilters.bde     = 'ALL';
+    
+    populateProgramFilter();
+    populateTLFilter();
+    populateBDEFilter('ALL');
+    
+    document.getElementById('filter-program').value = 'ALL';
+    document.getElementById('filter-tl').value      = 'ALL';
+    document.getElementById('filter-bde').value     = 'ALL';
+
+    // Update labels & sidebar
+    let gmLabel = 'All GMs';
+    let avatarChar = 'A';
+    if (activeFilters.gm !== 'ALL') {
+      const user = USERS[activeFilters.gm];
+      gmLabel = user.displayName;
+      avatarChar = user.displayName.charAt(0).toUpperCase();
+    }
+    
+    document.getElementById('gm-dashboard-label').textContent = gmLabel + "'s Dashboard";
+    document.getElementById('sidebar-avatar').textContent = avatarChar;
+    document.getElementById('sidebar-username').textContent = gmLabel;
+
+    // Populate sidebar team list for this GM
+    const teamList = document.getElementById('sidebar-team-list');
+    teamList.innerHTML = '';
+    const tls = getMyTLs();
+    tls.forEach(tl => {
+      const block = document.createElement('div');
+      block.className = 'team-tl-block';
+      block.innerHTML = `
+        <div class="team-tl-name">
+          <span class="team-tl-dot"></span>
+          TL ${tl.name}
+        </div>
+        <div class="team-tl-program">${tl.program}</div>
+        <div class="team-bde-list">
+          ${tl.bdes.map(b => `<span class="team-bde-pill">${b}</span>`).join('')}
+        </div>
+      `;
+      teamList.appendChild(block);
+    });
+  }
   // Program changed → reset TL & BDE, repopulate both dropdowns
-  if (activeFilters.program !== prevProgram) {
+  else if (activeFilters.program !== prevProgram) {
     activeFilters.tl  = 'ALL';
     activeFilters.bde = 'ALL';
     populateTLFilter();
@@ -621,16 +713,24 @@ function renderOverview() {
   // GM Performance Table
   const gmTbody = document.getElementById('ov-gm-table');
   gmTbody.innerHTML = '';
-  if (currentUser) {
-    const user = USERS[currentUser];
+  const gmsToShow = activeFilters.gm === 'ALL' ? Object.keys(USERS) : [activeFilters.gm || currentUser || 'umang'];
+  gmsToShow.forEach(gmKey => {
+    const user = USERS[gmKey];
+    if (!user) return;
     const gmName = user.displayName;
-    const gmPays = pData;
+    const gmTLNames = user.tls.map(t => t.name);
+    const gmPays = pData.filter(p => gmTLNames.includes(p.tl));
     const gmTokens = gmPays.filter(p => p.type === 'Token Booking').reduce((s, p) => s + p.amount, 0);
     const gmEnrolls = gmPays.filter(p => p.type === 'Full Enrollment').reduce((s, p) => s + p.amount, 0);
     const gmAchieved = gmTokens + gmEnrolls;
 
-    // GM target scales with filtered TLs
-    const gmTarget = myTLs.reduce((s, tl) => {
+    // GM target scales with filtered TLs for this GM
+    const gmTarget = user.tls.filter(tl => {
+      const inProg = activeFilters.program === 'ALL' || tl.program === activeFilters.program;
+      const inTL = activeFilters.tl === 'ALL' || tl.name === activeFilters.tl;
+      const inBde = activeFilters.bde === 'ALL' || tl.bdes.includes(activeFilters.bde);
+      return inProg && inTL && inBde;
+    }).reduce((s, tl) => {
       if (activeFilters.bde !== 'ALL') {
         if (tl.bdes.includes(activeFilters.bde)) {
           return s + (tl.target / tl.bdes.length);
@@ -640,8 +740,6 @@ function renderOverview() {
       return s + tl.target;
     }, 0);
 
-    const gmPct = gmTarget ? ((gmAchieved / gmTarget) * 100).toFixed(1) : 0;
-
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="bold">GM ${gmName}</td>
@@ -650,7 +748,7 @@ function renderOverview() {
       <td class="mono">${fCurrency(gmEnrolls)}</td>
     `;
     gmTbody.appendChild(tr);
-  }
+  });
 
   // TL Performance Table
   const tlTbody = document.getElementById('ov-tl-perf-table');
@@ -932,15 +1030,23 @@ function renderRevenue() {
   // GM Performance Table
   const gmTbody = document.getElementById('rev-gm-table');
   gmTbody.innerHTML = '';
-  if (currentUser) {
-    const user = USERS[currentUser];
+  const gmsToShow = activeFilters.gm === 'ALL' ? Object.keys(USERS) : [activeFilters.gm || currentUser || 'umang'];
+  gmsToShow.forEach(gmKey => {
+    const user = USERS[gmKey];
+    if (!user) return;
     const gmName = user.displayName;
-    const gmPays = pData;
+    const gmTLNames = user.tls.map(t => t.name);
+    const gmPays = pData.filter(p => gmTLNames.includes(p.tl));
     const gmTokens = gmPays.filter(p => p.type === 'Token Booking').reduce((s, p) => s + p.amount, 0);
     const gmEnrolls = gmPays.filter(p => p.type === 'Full Enrollment').reduce((s, p) => s + p.amount, 0);
     const gmAchieved = gmTokens + gmEnrolls;
 
-    const gmTarget = myTLs.reduce((s, tl) => {
+    const gmTarget = user.tls.filter(tl => {
+      const inProg = activeFilters.program === 'ALL' || tl.program === activeFilters.program;
+      const inTL = activeFilters.tl === 'ALL' || tl.name === activeFilters.tl;
+      const inBde = activeFilters.bde === 'ALL' || tl.bdes.includes(activeFilters.bde);
+      return inProg && inTL && inBde;
+    }).reduce((s, tl) => {
       if (activeFilters.bde !== 'ALL') {
         if (tl.bdes.includes(activeFilters.bde)) {
           return s + (tl.target / tl.bdes.length);
@@ -950,8 +1056,6 @@ function renderRevenue() {
       return s + tl.target;
     }, 0);
 
-    const gmPct = gmTarget ? ((gmAchieved / gmTarget) * 100).toFixed(1) : 0;
-
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="bold">GM ${gmName}</td>
@@ -960,7 +1064,7 @@ function renderRevenue() {
       <td class="mono">${fCurrency(gmEnrolls)}</td>
     `;
     gmTbody.appendChild(tr);
-  }
+  });
 
   // TL Performance Table
   const tlTbody = document.getElementById('rev-tl-perf-table');
@@ -1165,15 +1269,19 @@ function renderProductivity() {
   // Render GM Performance Table
   const gmTbody = document.getElementById('prod-gm-table');
   gmTbody.innerHTML = '';
-  if (currentUser) {
-    const user = USERS[currentUser];
+  const gmsToShow = activeFilters.gm === 'ALL' ? Object.keys(USERS) : [activeFilters.gm || currentUser || 'umang'];
+  gmsToShow.forEach(gmKey => {
+    const user = USERS[gmKey];
+    if (!user) return;
     const gmName = user.displayName;
+    const gmTLNames = user.tls.map(t => t.name);
+    const gmCalls = cData.filter(c => gmTLNames.includes(c.tl));
 
-    const gmDials = cData.reduce((sum, c) => sum + c.calls, 0);
-    const gmConnects = cData.reduce((sum, c) => sum + c.connected, 0);
-    const gmTalk = cData.reduce((sum, c) => sum + c.talkTimeMin, 0);
+    const gmDials = gmCalls.reduce((sum, c) => sum + c.calls, 0);
+    const gmConnects = gmCalls.reduce((sum, c) => sum + c.connected, 0);
+    const gmTalk = gmCalls.reduce((sum, c) => sum + c.talkTimeMin, 0);
 
-    const gmActiveBdes = [...new Set(cData.map(c => c.bde))].length || 1;
+    const gmActiveBdes = [...new Set(gmCalls.map(c => c.bde))].length || 1;
 
     const gmAvgCall = (gmDials / (gmActiveBdes * daysCount)).toFixed(1);
     const gmAvgCC = (gmConnects / (gmActiveBdes * daysCount)).toFixed(1);
@@ -1190,7 +1298,7 @@ function renderProductivity() {
       <td class="mono">${formatAvgTalk(gmAvgSec)}</td>
     `;
     gmTbody.appendChild(tr);
-  }
+  });
 
   // Render TL Performance Table
   const tlTbody = document.getElementById('prod-tl-perf-table');
@@ -1356,13 +1464,18 @@ function renderLeads() {
   // Render GM-wise Lead Summary Table
   const gmTbody = document.getElementById('lead-gm-table');
   gmTbody.innerHTML = '';
-  if (currentUser) {
-    const user = USERS[currentUser];
+  const gmsToShow = activeFilters.gm === 'ALL' ? Object.keys(USERS) : [activeFilters.gm || currentUser || 'umang'];
+  gmsToShow.forEach(gmKey => {
+    const user = USERS[gmKey];
+    if (!user) return;
     const gmName = user.displayName;
-    const gmTotal = lData.length;
-    const gmInt = lData.filter(l => l.stage === 'Interested').length;
-    const gmFU = lData.filter(l => l.stage === 'Follow Up').length;
-    const gmEnr = lData.filter(l => l.stage === 'Enrolled').length;
+    const gmTLNames = user.tls.map(t => t.name);
+    const gmLeads = lData.filter(l => gmTLNames.includes(l.tl));
+    
+    const gmTotal = gmLeads.length;
+    const gmInt = gmLeads.filter(l => l.stage === 'Interested').length;
+    const gmFU = gmLeads.filter(l => l.stage === 'Follow Up').length;
+    const gmEnr = gmLeads.filter(l => l.stage === 'Enrolled').length;
     const gmConv = gmTotal ? ((gmEnr / gmTotal) * 100).toFixed(1) : 0;
 
     const tr = document.createElement('tr');
@@ -1375,7 +1488,7 @@ function renderLeads() {
       <td>${rateBadge(parseFloat(gmConv))}</td>
     `;
     gmTbody.appendChild(tr);
-  }
+  });
 
   // TL lead summary table
   const tlTbody = document.getElementById('lead-tl-table');
@@ -1529,7 +1642,7 @@ function getBaseLAData() {
 function renderLeadAnalysis() {
   // Ensure dropdowns are populated / updated when GM user or program changes
   const tlSel1 = document.getElementById('t1-filter-tl');
-  const currentKey = `${currentUser}-${activeFilters.program}`;
+  const currentKey = `${activeFilters.gm}-${activeFilters.program}`;
   if (tlSel1 && tlSel1.dataset.key !== currentKey) {
     populateTLAndBDEDropdowns('t1-filter-tl', 't1-filter-bde');
     populateTLAndBDEDropdowns('t2-filter-tl', 't2-filter-bde');
@@ -1858,7 +1971,19 @@ function emptyRow(tbody, cols) {
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
   // Show login, hide dashboard
+  /*
   document.getElementById('app-layout').style.display = 'none';
   document.getElementById('login-overlay').style.display = 'flex';
   document.getElementById('login-username').focus();
+  */
+
+  // Directly open main dashboard
+  currentUser = 'umang'; // Default GM session
+  activeFilters.gm = 'ALL'; // Start with All GMs view
+  initDashboard();
+  document.getElementById('app-layout').style.display = 'grid';
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
 });
