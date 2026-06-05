@@ -46,6 +46,93 @@ const USERS = {
 };
 
 // ==========================================
+// GM CREDENTIALS & ACCESS CONTROL
+// ==========================================
+const GM_USERS = {
+  syed: {
+    password: 'Syed@8743',
+    displayName: 'Syed',
+    access: 'ALL'
+  },
+  anshul: {
+    password: 'Anshul@4241',
+    displayName: 'Anshul',
+    access: ['Anshul', 'Umang', 'Rekha', 'Ajay']
+  },
+  siddhartha: {
+    password: 'Siddharth@3543',
+    displayName: 'Siddhartha',
+    access: ['Siddhartha']
+  },
+  siddharth: {
+    password: 'Siddharth@3543',
+    displayName: 'Siddhartha',
+    access: ['Siddhartha']
+  },
+  rekha: {
+    password: 'Rekha@4524',
+    displayName: 'Rekha',
+    access: ['Rekha']
+  },
+  shringarika: {
+    password: 'Shringarika@4324',
+    displayName: 'Shringarika',
+    access: ['Shringarika']
+  },
+  umang: {
+    password: 'Umang@y6362',
+    displayName: 'Umang',
+    access: ['Umang']
+  },
+  sowmya: {
+    password: 'Sowmya@2432',
+    displayName: 'Sowmya',
+    access: ['Sowmya']
+  },
+  anshuman: {
+    password: 'Anshuman@4655',
+    displayName: 'Anshuman',
+    access: ['Anshuman']
+  },
+  kavish: {
+    password: 'Kavish@6463',
+    displayName: 'Kavish',
+    access: ['Kavish']
+  },
+  ajay: {
+    password: 'Ajay@8248',
+    displayName: 'Ajay',
+    access: ['Ajay']
+  }
+};
+
+function getAllowedGMs() {
+  if (!currentUser) return [];
+  const userConfig = GM_USERS[currentUser.toLowerCase()];
+  if (!userConfig) return [];
+  if (userConfig.access === 'ALL') {
+    const gms = new Set();
+    if (prodLoaded) prodAllRows.forEach(r => { if (r.gm) gms.add(r.gm); });
+    if (laLoaded) laAllRows.forEach(r => { if (r.gm) gms.add(r.gm); });
+    if (revLoaded) {
+      revTokenRows.forEach(r => { if (r.gm) gms.add(r.gm); });
+      revFullRows.forEach(r => { if (r.gm) gms.add(r.gm); });
+    }
+    if (gms.size === 0) {
+      return ['Anshul', 'Umang', 'Anshuman', 'Rekha', 'Kavish', 'Siddhartha', 'Sowmya', 'Shringarika', 'Ajay'];
+    }
+    return [...gms].sort();
+  }
+  return userConfig.access;
+}
+
+function isGMAllowed(gmName) {
+  if (!gmName) return false;
+  const allowed = getAllowedGMs();
+  return allowed.includes(gmName);
+}
+
+// ==========================================
 // GLOBAL STATE
 // ==========================================
 let currentUser = null;   // set on login
@@ -203,7 +290,7 @@ function renderSidebarTeam() {
 
   if (prodLoaded || laLoaded) {
     const tree = buildTeamTreeFromCSV();
-    let gmNames = Object.keys(tree).sort();
+    let gmNames = Object.keys(tree).filter(g => isGMAllowed(g)).sort();
     if (activeFilters.gm !== 'ALL') {
       gmNames = gmNames.filter(g => g === activeFilters.gm);
     }
@@ -389,11 +476,15 @@ function fNum(n) { return n.toLocaleString('en-IN'); }
 function getMyTLs() {
   let allTLs = [];
   if (activeFilters.gm === 'ALL') {
-    Object.keys(USERS).forEach(username => {
-      allTLs = allTLs.concat(USERS[username].tls);
+    const allowed = getAllowedGMs();
+    allowed.forEach(gmName => {
+      const gmKey = gmName.toLowerCase();
+      if (USERS[gmKey]) {
+        allTLs = allTLs.concat(USERS[gmKey].tls);
+      }
     });
   } else {
-    const gm = activeFilters.gm || currentUser || 'umang';
+    const gm = (activeFilters.gm || currentUser || 'umang').toLowerCase();
     allTLs = USERS[gm] ? USERS[gm].tls : [];
   }
   if (activeFilters.program !== 'ALL') {
@@ -439,7 +530,7 @@ function handleLogin() {
   const password = document.getElementById('login-password').value;
   const errorEl  = document.getElementById('login-error');
 
-  if (USERS[username] && USERS[username].password === password) {
+  if (GM_USERS[username] && GM_USERS[username].password === password) {
     errorEl.classList.remove('show');
     currentUser = username;
     initDashboard();
@@ -475,27 +566,31 @@ function handleLogout() {
 // DASHBOARD INIT (after login)
 // ==========================================
 function initDashboard() {
-  const user = USERS[currentUser] || { displayName: 'Umang' };
+  const allowed = getAllowedGMs();
+  const userDisplayName = GM_USERS[currentUser]?.displayName || 'GM';
 
   // Set GM name label in top navbar
-  const currentGMName = activeFilters.gm === 'ALL' ? 'All GMs' : (USERS[activeFilters.gm]?.displayName || user.displayName);
-  document.getElementById('gm-dashboard-label').textContent = currentGMName + "'s Dashboard";
+  document.getElementById('gm-dashboard-label').textContent = userDisplayName + "'s Dashboard";
 
   // Sidebar user info
-  document.getElementById('sidebar-avatar').textContent = currentGMName.charAt(0).toUpperCase();
-  document.getElementById('sidebar-username').textContent = currentGMName;
+  document.getElementById('sidebar-avatar').textContent = userDisplayName.charAt(0).toUpperCase();
+  document.getElementById('sidebar-username').textContent = userDisplayName;
 
   renderSidebarTeam();
 
   // Reset all filters for clean state
-  activeFilters.gm = 'ALL';
+  activeFilters.gm = allowed.length === 1 ? allowed[0] : 'ALL';
   activeFilters.program = 'ALL';
   activeFilters.tl = 'ALL';
   activeFilters.bde = 'ALL';
 
+  const gmFilterGroup = document.getElementById('gm-filter-group');
+  if (gmFilterGroup) {
+    gmFilterGroup.style.display = allowed.length <= 1 ? 'none' : 'flex';
+  }
+
   if (document.getElementById('filter-gm')) {
     populateGMFilterFromUsers();
-    document.getElementById('filter-gm').value = activeFilters.gm;
   }
 
   // Populate Program filter (all programs this GM manages)
@@ -525,14 +620,32 @@ function populateGMFilterFromUsers() {
   const gmSel = document.getElementById('filter-gm');
   if (!gmSel) return;
   const current = gmSel.value;
-  gmSel.innerHTML = '<option value="ALL">All GMs</option>';
-  Object.keys(USERS).forEach(key => {
+  gmSel.innerHTML = '';
+  
+  const allowed = getAllowedGMs();
+  if (allowed.length > 1) {
+    gmSel.innerHTML = '<option value="ALL">All GMs</option>';
+  }
+  allowed.forEach(name => {
     const opt = document.createElement('option');
-    opt.value = key;
-    opt.textContent = USERS[key].displayName;
+    opt.value = name;
+    opt.textContent = name;
     gmSel.appendChild(opt);
   });
-  gmSel.value = Object.keys(USERS).includes(current) ? current : 'ALL';
+  
+  if (allowed.length === 1) {
+    activeFilters.gm = allowed[0];
+  } else if (!allowed.includes(current)) {
+    activeFilters.gm = 'ALL';
+  } else {
+    activeFilters.gm = current;
+  }
+  gmSel.value = activeFilters.gm;
+  
+  const gmFilterGroup = document.getElementById('gm-filter-group');
+  if (gmFilterGroup) {
+    gmFilterGroup.style.display = allowed.length <= 1 ? 'none' : 'flex';
+  }
 }
 
 // Populate Program filter for logged-in GM
@@ -595,7 +708,7 @@ function populateBDEFilter(tlName) {
   bdes.forEach(bde => {
     const opt = document.createElement('option');
     opt.value = bde;
-    opt.textContent = bde;
+    opt.textContent = emailToDisplayName(bde);
     bdeSelect.appendChild(opt);
   });
   bdeSelect.value = activeFilters.bde;
@@ -1093,7 +1206,7 @@ function revMatchesFilters(row, dateField) {
   const dt = row[dateField];
   const inDate    = (!activeFilters.dateFrom || dt >= activeFilters.dateFrom) &&
                     (!activeFilters.dateTo   || dt <= activeFilters.dateTo);
-  const inGM      = activeFilters.gm      === 'ALL' || row.gm      === activeFilters.gm;
+  const inGM      = activeFilters.gm      === 'ALL' ? isGMAllowed(row.gm) : row.gm      === activeFilters.gm;
   const inProgram = activeFilters.program === 'ALL' || row.type    === activeFilters.program;
   const inTL      = activeFilters.tl      === 'ALL' || row.tl      === activeFilters.tl;
   const inBDE     = activeFilters.bde     === 'ALL' || row.bdMail  === activeFilters.bde;
@@ -1135,16 +1248,32 @@ function populateRevGlobalFilters() {
   const gmSel = document.getElementById('filter-gm');
   if (gmSel) {
     const current = activeFilters.gm;
-    const gmNames = [...new Set(revTokenRows.map(r => r.gm).filter(Boolean))].sort();
-    gmSel.innerHTML = '<option value="ALL">All GMs</option>';
+    const gmNames = [...new Set(revTokenRows.map(r => r.gm).filter(Boolean))].filter(g => isGMAllowed(g)).sort();
+    gmSel.innerHTML = '';
+    if (gmNames.length > 1) {
+      gmSel.innerHTML = '<option value="ALL">All GMs</option>';
+    }
     gmNames.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name;
       gmSel.appendChild(opt);
     });
-    activeFilters.gm = gmNames.includes(current) ? current : 'ALL';
+    
+    const allowed = getAllowedGMs();
+    if (allowed.length === 1) {
+      activeFilters.gm = allowed[0];
+    } else if (!gmNames.includes(current)) {
+      activeFilters.gm = 'ALL';
+    } else {
+      activeFilters.gm = current;
+    }
     gmSel.value = activeFilters.gm;
+    
+    const gmFilterGroup = document.getElementById('gm-filter-group');
+    if (gmFilterGroup) {
+      gmFilterGroup.style.display = allowed.length <= 1 ? 'none' : 'flex';
+    }
   }
   populateRevPrograms();
   populateRevTLs();
@@ -1198,7 +1327,7 @@ function populateRevBDEs(tlName) {
   bdes.forEach(b => {
     const opt = document.createElement('option');
     opt.value = b;
-    opt.textContent = b;
+    opt.textContent = emailToDisplayName(b);
     sel.appendChild(opt);
   });
   activeFilters.bde = bdes.includes(activeFilters.bde) ? activeFilters.bde : 'ALL';
@@ -1491,7 +1620,7 @@ function getProdOwnersForProgram() {
   const owners = new Set(
     laAllRows
       .filter(r => {
-        const inGM = activeFilters.gm === 'ALL' || r.gm === activeFilters.gm;
+        const inGM = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
         return inGM && r.program === activeFilters.program;
       })
       .map(r => r.owner)
@@ -1504,7 +1633,7 @@ function getProdGlobalData() {
   return prodAllRows.filter(r => {
     const inDate = (!activeFilters.dateFrom || r.date >= activeFilters.dateFrom) &&
                    (!activeFilters.dateTo   || r.date <= activeFilters.dateTo);
-    const inGM   = activeFilters.gm === 'ALL' || r.gm === activeFilters.gm;
+    const inGM   = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
     return inDate && inGM && r.owner;
   });
 }
@@ -1522,16 +1651,32 @@ function populateProdGlobalFilters() {
   const gmSel = document.getElementById('filter-gm');
   if (gmSel) {
     const current = activeFilters.gm;
-    const gmNames = [...new Set(prodAllRows.map(r => r.gm).filter(Boolean))].sort();
-    gmSel.innerHTML = '<option value="ALL">All GMs</option>';
+    const gmNames = [...new Set(prodAllRows.map(r => r.gm).filter(Boolean))].filter(g => isGMAllowed(g)).sort();
+    gmSel.innerHTML = '';
+    if (gmNames.length > 1) {
+      gmSel.innerHTML = '<option value="ALL">All GMs</option>';
+    }
     gmNames.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name;
       gmSel.appendChild(opt);
     });
-    activeFilters.gm = gmNames.includes(current) ? current : 'ALL';
+    
+    const allowed = getAllowedGMs();
+    if (allowed.length === 1) {
+      activeFilters.gm = allowed[0];
+    } else if (!gmNames.includes(current)) {
+      activeFilters.gm = 'ALL';
+    } else {
+      activeFilters.gm = current;
+    }
     gmSel.value = activeFilters.gm;
+    
+    const gmFilterGroup = document.getElementById('gm-filter-group');
+    if (gmFilterGroup) {
+      gmFilterGroup.style.display = allowed.length <= 1 ? 'none' : 'flex';
+    }
   }
   populateProdPrograms();
   populateProdTLs();
@@ -1590,7 +1735,7 @@ function populateProdBDEs(tlName) {
   bdes.forEach(b => {
     const opt = document.createElement('option');
     opt.value = b;
-    opt.textContent = b;
+    opt.textContent = emailToDisplayName(b);
     sel.appendChild(opt);
   });
   activeFilters.bde = bdes.includes(activeFilters.bde) ? activeFilters.bde : 'ALL';
@@ -2188,16 +2333,32 @@ function populateLAGlobalFilters() {
   const gmSel = document.getElementById('filter-gm');
   if (gmSel) {
     const current  = activeFilters.gm;
-    const gmNames  = [...new Set(laAllRows.map(r => r.gm).filter(Boolean))].sort();
-    gmSel.innerHTML = '<option value="ALL">All GMs</option>';
+    const gmNames  = [...new Set(laAllRows.map(r => r.gm).filter(Boolean))].filter(g => isGMAllowed(g)).sort();
+    gmSel.innerHTML = '';
+    if (gmNames.length > 1) {
+      gmSel.innerHTML = '<option value="ALL">All GMs</option>';
+    }
     gmNames.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name;
       gmSel.appendChild(opt);
     });
-    activeFilters.gm = gmNames.includes(current) ? current : 'ALL';
+    
+    const allowed = getAllowedGMs();
+    if (allowed.length === 1) {
+      activeFilters.gm = allowed[0];
+    } else if (!gmNames.includes(current)) {
+      activeFilters.gm = 'ALL';
+    } else {
+      activeFilters.gm = current;
+    }
     gmSel.value = activeFilters.gm;
+    
+    const gmFilterGroup = document.getElementById('gm-filter-group');
+    if (gmFilterGroup) {
+      gmFilterGroup.style.display = allowed.length <= 1 ? 'none' : 'flex';
+    }
   }
   populateLAPrograms();
   populateLATLs();
@@ -2251,7 +2412,7 @@ function populateLABDEs(tlName) {
   bdes.forEach(b => {
     const opt = document.createElement('option');
     opt.value = b;
-    opt.textContent = b;
+    opt.textContent = emailToDisplayName(b);
     sel.appendChild(opt);
   });
   activeFilters.bde = bdes.includes(activeFilters.bde) ? activeFilters.bde : 'ALL';
@@ -2263,7 +2424,7 @@ function getLAGlobalData() {
   return laAllRows.filter(r => {
     const inDate    = (!activeFilters.dateFrom || r.createdOn >= activeFilters.dateFrom) &&
                       (!activeFilters.dateTo   || r.createdOn <= activeFilters.dateTo);
-    const inGM      = activeFilters.gm      === 'ALL' || r.gm      === activeFilters.gm;
+    const inGM      = activeFilters.gm      === 'ALL' ? isGMAllowed(r.gm) : r.gm      === activeFilters.gm;
     const inProgram = activeFilters.program === 'ALL' || r.program === activeFilters.program;
     return inDate && inGM && inProgram;
   });
@@ -2334,7 +2495,7 @@ function populateTableTLAndBDE(tlSelId, bdeSelId, basePool) {
   bdes.forEach(name => {
     const opt = document.createElement('option');
     opt.value = name;
-    opt.textContent = name;
+    opt.textContent = emailToDisplayName(name);
     bdeSel.appendChild(opt);
   });
   bdeSel.value = bdes.includes(selectedBDE) ? selectedBDE : 'ALL';
@@ -2400,7 +2561,7 @@ function populateT1Dropdowns() {
   bdes.forEach(email => {
     const opt = document.createElement('option');
     opt.value = email;
-    opt.textContent = email;
+    opt.textContent = emailToDisplayName(email);
     bdeSel.appendChild(opt);
   });
   bdeSel.value = bdes.includes(selectedBDE) ? selectedBDE : 'ALL';
@@ -2416,7 +2577,7 @@ function onT1TLChange() {
     bdes.forEach(email => {
       const opt = document.createElement('option');
       opt.value = email;
-      opt.textContent = email;
+      opt.textContent = emailToDisplayName(email);
       bdeSel.appendChild(opt);
     });
     bdeSel.value = 'ALL';
@@ -2490,7 +2651,7 @@ function onT2TLChange() {
     bdes.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
-      opt.textContent = name;
+      opt.textContent = emailToDisplayName(name);
       bdeSel.appendChild(opt);
     });
     bdeSel.value = 'ALL';
@@ -2535,7 +2696,7 @@ function onT3TLChange() {
     bdes.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
-      opt.textContent = name;
+      opt.textContent = emailToDisplayName(name);
       bdeSel.appendChild(opt);
     });
     bdeSel.value = 'ALL';
@@ -2684,19 +2845,13 @@ function emptyRow(tbody, cols) {
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
   // Show login, hide dashboard
-  /*
   document.getElementById('app-layout').style.display = 'none';
-  document.getElementById('login-overlay').style.display = 'flex';
-  document.getElementById('login-username').focus();
-  */
-
-  // Directly open main dashboard
-  currentUser = 'umang'; // Default GM session
-  activeFilters.gm = 'ALL'; // Start with All GMs view
-  initDashboard();
-  document.getElementById('app-layout').style.display = 'grid';
   const overlay = document.getElementById('login-overlay');
   if (overlay) {
-    overlay.style.display = 'none';
+    overlay.style.display = 'flex';
+  }
+  const usernameInput = document.getElementById('login-username');
+  if (usernameInput) {
+    usernameInput.focus();
   }
 });
