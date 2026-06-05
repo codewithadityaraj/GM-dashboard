@@ -114,15 +114,15 @@
           </svg>
           Lead Analysis
         </a>
-      </nav>
 
-      <!-- Team section in sidebar -->
-      <div class="sidebar-team" id="sidebar-team">
-        <div class="sidebar-team-title">My Team</div>
-        <div id="sidebar-team-list">
-          <!-- Populated by JS -->
+        <!-- My Team — directly below Lead Analysis -->
+        <div class="sidebar-team" id="sidebar-team">
+          <div class="sidebar-team-title">My Team</div>
+          <div id="sidebar-team-list">
+            <!-- Populated by JS -->
+          </div>
         </div>
-      </div>
+      </nav>
 
       <div class="sidebar-footer">
         <div class="user-info-wrap">
@@ -167,8 +167,6 @@
               <label class="filter-label">GM</label>
               <select class="filter-select" id="filter-gm" onchange="applyFilters()">
                 <option value="ALL">All GMs</option>
-                <option value="umang">Umang</option>
-                <option value="siddharth">Siddharth</option>
               </select>
             </div>
 
@@ -393,7 +391,7 @@
               <table class="simple-table">
                 <thead>
                   <tr>
-                    <th>BDA Name</th>
+                    <th>BD Mail</th>
                     <th>Target</th>
                     <th>Token Collected</th>
                     <th>Enrollment</th>
@@ -518,10 +516,6 @@
                   <div class="sub-metric-val" id="rev-lead-enrollments">₹0</div>
                   <div class="sub-metric-lbl">Enrollment Rev</div>
                 </div>
-                <div class="sub-metric-card">
-                  <div class="sub-metric-val" id="rev-lead-avg-ticket">₹0</div>
-                  <div class="sub-metric-lbl">Avg Ticket Size</div>
-                </div>
               </div>
             </div>
 
@@ -611,7 +605,7 @@
               <table class="simple-table">
                 <thead>
                   <tr>
-                    <th>BDA Name</th>
+                    <th>BD Mail</th>
                     <th>Target</th>
                     <th>Token Collected</th>
                     <th>Enrollment</th>
@@ -729,7 +723,9 @@
                   <tr>
                     <th>GM Name</th>
                     <th>Total Call</th>
-                    <th>TCC</th>
+                    <th>Total Connected</th>
+                    <th>Unique Dialled</th>
+                    <th>CPL</th>
                     <th>TT</th>
                     <th>Avg Call</th>
                     <th>Avg CC</th>
@@ -754,7 +750,9 @@
                   <tr>
                     <th>TL Name</th>
                     <th>Total Call</th>
-                    <th>TCC</th>
+                    <th>Total Connected</th>
+                    <th>Unique Dialled</th>
+                    <th>CPL</th>
                     <th>TT</th>
                     <th>Avg Call</th>
                     <th>Avg CC</th>
@@ -779,7 +777,9 @@
                   <tr>
                     <th>BDA Name</th>
                     <th>Total Call</th>
-                    <th>TCC</th>
+                    <th>Total Connected</th>
+                    <th>Unique Dialled</th>
+                    <th>CPL</th>
                     <th>TT</th>
                     <th>Avg Call</th>
                     <th>Avg CC</th>
@@ -873,7 +873,7 @@
             <!-- Lead Source breakdown -->
             <div class="card">
               <div class="card-header">
-                <h2 class="card-title">Lead Source Mix</h2>
+                <h2 class="card-title">Sub Source Mix</h2>
               </div>
               <div class="target-progress-wrap" id="lead-sources-list" style="display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
                 <!-- JS populated progress bars -->
@@ -998,18 +998,6 @@
               </div>
             </div>
             <div class="la-kpi-card">
-              <div class="la-kpi-icon la-icon-amber">
-                <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                  <polyline points="23 4 23 10 17 10"/>
-                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                </svg>
-              </div>
-              <div class="la-kpi-info">
-                <div class="la-kpi-val" id="la-kpi-chase">0</div>
-                <div class="la-kpi-lbl">Chase Leads</div>
-              </div>
-            </div>
-            <div class="la-kpi-card">
               <div class="la-kpi-icon la-icon-cyan">
                 <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                   <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
@@ -1056,8 +1044,7 @@
               <table class="simple-table">
                 <thead>
                   <tr>
-                    <th>Date</th><th>Lead Count</th><th>Top Bucket</th>
-                    <th>Token</th><th>CVR%</th><th>CPL</th><th>Chase</th>
+                    <th>Date</th><th>Lead Count</th><th>Tokens</th><th>Enrolled</th><th>CVR%</th>
                   </tr>
                 </thead>
                 <tbody id="la-table1-body"></tbody>
@@ -1074,12 +1061,12 @@
               </div>
             </div>
 
-            <!-- Table 2 Filters: Source + TL + BDE -->
+            <!-- Table 2 Filters: Sub Source + TL + BDE -->
             <div class="la-inline-filters la-filters-t2">
               <div class="la-filter-group">
-                <label class="la-filter-lbl">Source</label>
+                <label class="la-filter-lbl">Sub Source</label>
                 <select class="la-select" id="t2-filter-source" onchange="renderTable2()">
-                  <option value="ALL">All Sources</option>
+                  <option value="ALL">All Sub Sources</option>
                 </select>
               </div>
               <div class="la-filter-group">
@@ -1104,8 +1091,7 @@
               <table class="simple-table">
                 <thead>
                   <tr>
-                    <th>Date</th><th>Lead Count</th><th>Top Bucket</th>
-                    <th>Token</th><th>CVR%</th><th>CPL</th><th>Chase</th>
+                    <th>Sub Source</th><th>Lead Count</th><th>Tokens</th><th>Enrolled</th><th>CVR%</th>
                   </tr>
                 </thead>
                 <tbody id="la-table2-body"></tbody>
@@ -1158,8 +1144,7 @@
               <table class="simple-table">
                 <thead>
                   <tr>
-                    <th>Date</th><th>Lead Count</th><th>Top Bucket</th>
-                    <th>Token</th><th>CVR%</th><th>CPL</th><th>Chase</th>
+                    <th>Campaign</th><th>Lead Count</th><th>Tokens</th><th>Enrolled</th><th>CVR%</th>
                   </tr>
                 </thead>
                 <tbody id="la-table3-body"></tbody>

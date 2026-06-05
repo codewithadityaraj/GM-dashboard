@@ -1,0 +1,29 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+# Optional: server-filtered leads (if direct browser fetch is too slow)
+# [functions.leads]
+#   timeout = 26
+# [[redirects]]
+#   from = "/api/leads"
+#   to = "/.netlify/functions/leads"
+#   status = 200
+
+[[redirects]]
+  from = "/api/config"
+  to = "/.netlify/functions/config"
+  status = 200
+
+[[redirects]]
+  from = "/api/sheets"
+  to = "/.netlify/functions/sheets"
+  status = 200
+
+[[headers]]
+  for = "/api/sheets"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
