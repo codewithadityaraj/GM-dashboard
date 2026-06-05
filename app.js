@@ -544,22 +544,7 @@ function handleLogin() {
 }
 
 function handleLogout() {
-  // Destroy all charts
-  Object.keys(charts).forEach(k => {
-    if (charts[k]) { charts[k].destroy(); delete charts[k]; }
-  });
-
-  currentUser = null;
-  activeFilters = { gm: 'ALL', program: 'ALL', tl: 'ALL', bde: 'ALL', dateFrom: '2026-05-01', dateTo: '2026-05-28' };
-
-  document.getElementById('app-layout').style.display = 'none';
-  const overlay = document.getElementById('login-overlay');
-  if (overlay) {
-    overlay.style.display = 'flex';
-    document.getElementById('login-username').value = '';
-    document.getElementById('login-password').value = '';
-    document.getElementById('login-error').classList.remove('show');
-  }
+  window.location.reload();
 }
 
 // ==========================================
