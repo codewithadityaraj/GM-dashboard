@@ -1001,6 +1001,144 @@ html, body {
   overflow-x: auto;
 }
 
+/* Lead Report summary tables — sticky name + total columns, scroll the rest */
+.table-wrap-sticky {
+  overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  isolation: isolate;
+}
+
+.table-wrap-sticky .lead-summary-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.table-wrap-sticky .lead-summary-table th,
+.table-wrap-sticky .lead-summary-table td {
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 10px 8px;
+}
+
+.table-wrap-sticky .lead-summary-table .col-name {
+  text-align: left;
+  white-space: nowrap;
+  width: 168px;
+  min-width: 168px;
+  max-width: 168px;
+}
+
+.table-wrap-sticky .lead-summary-table .col-text {
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  width: var(--col-text-width, 260px);
+  min-width: var(--col-text-width, 260px);
+  max-width: var(--col-text-width, 260px);
+  overflow: hidden;
+  vertical-align: top;
+  line-height: 1.45;
+}
+
+.table-wrap-sticky .lead-summary-table th.col-text {
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.table-wrap-sticky .lead-summary-table th.col-num,
+.table-wrap-sticky .lead-summary-table td.col-num {
+  text-align: center;
+}
+
+.table-wrap-sticky .lead-summary-table th.col-name,
+.table-wrap-sticky .lead-summary-table td.col-name {
+  text-align: left;
+}
+
+.table-wrap-sticky .lead-summary-table td.col-num,
+.table-wrap-sticky .lead-summary-table th.col-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table-wrap-sticky .lead-summary-table th.col-num {
+  font-size: 10px;
+  line-height: 1.3;
+  vertical-align: bottom;
+}
+
+.table-wrap-sticky .lead-summary-table .col-pct {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.table-wrap-sticky .sticky-col {
+  position: sticky;
+  z-index: 4;
+  background-color: #fff;
+  background-clip: padding-box;
+}
+
+.table-wrap-sticky thead .sticky-col {
+  z-index: 6;
+  background-color: #f8fafc;
+}
+
+.table-wrap-sticky tbody tr:nth-child(even) .sticky-col {
+  background-color: #fafbfc;
+}
+
+.table-wrap-sticky tbody tr:hover .sticky-col {
+  background-color: #f1f5f9;
+}
+
+.table-wrap-sticky .sticky-col-1 {
+  left: 0;
+  width: 168px;
+  min-width: 168px;
+  max-width: 168px;
+  z-index: 4;
+}
+
+.table-wrap-sticky .sticky-col-2 {
+  left: 168px;
+  width: 104px;
+  min-width: 104px;
+  max-width: 104px;
+  z-index: 5;
+}
+
+.table-wrap-sticky thead .sticky-col-1 {
+  z-index: 6;
+}
+
+.table-wrap-sticky thead .sticky-col-2 {
+  z-index: 7;
+}
+
+.table-wrap-sticky .sticky-col-last {
+  box-shadow: 4px 0 6px -2px rgba(15, 23, 42, 0.15);
+}
+
+/* Accent card sticky backgrounds — must be fully opaque so scroll cols stay hidden */
+.card.accent-amber .table-wrap-sticky thead .sticky-col { background-color: #ffedd5; }
+.card.accent-amber .table-wrap-sticky tbody tr .sticky-col { background-color: #fff; }
+.card.accent-amber .table-wrap-sticky tbody tr:nth-child(even) .sticky-col { background-color: #fffbeb; }
+.card.accent-amber .table-wrap-sticky tbody tr:hover .sticky-col { background-color: #fef3c7; }
+
+.card.accent-cyan .table-wrap-sticky thead .sticky-col { background-color: #cffafe; }
+.card.accent-cyan .table-wrap-sticky tbody tr .sticky-col { background-color: #fff; }
+.card.accent-cyan .table-wrap-sticky tbody tr:nth-child(even) .sticky-col { background-color: #ecfeff; }
+.card.accent-cyan .table-wrap-sticky tbody tr:hover .sticky-col { background-color: #cffafe; }
+
+.card.accent-emerald .table-wrap-sticky thead .sticky-col { background-color: #d1fae5; }
+.card.accent-emerald .table-wrap-sticky tbody tr .sticky-col { background-color: #fff; }
+.card.accent-emerald .table-wrap-sticky tbody tr:nth-child(even) .sticky-col { background-color: #ecfdf5; }
+.card.accent-emerald .table-wrap-sticky tbody tr:hover .sticky-col { background-color: #d1fae5; }
+
 .simple-table {
   width: 100%;
   border-collapse: collapse;
@@ -1037,6 +1175,49 @@ html, body {
 .simple-table tbody tr:last-child td { border-bottom: none; }
 
 .simple-table tbody tr:hover td { background: #f1f5f9; }
+
+/* Performance tables — fixed columns, centered metrics */
+.perf-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.perf-table th,
+.perf-table td {
+  box-sizing: border-box;
+  padding: 10px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.perf-table .col-name {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.perf-table .col-num {
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-table th.col-num {
+  font-size: 10px;
+  line-height: 1.3;
+  vertical-align: bottom;
+}
+
+.perf-table.perf-table-wide {
+  min-width: 808px;
+}
+
+.perf-table.perf-table-rev {
+  min-width: 464px;
+}
+
+.perf-table.perf-table-rev-bda {
+  min-width: 584px;
+}
 
 /* Table utility classes */
 .bold { font-weight: 600; }

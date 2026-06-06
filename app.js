@@ -160,6 +160,7 @@ const SHEETS_API = {
   productivity: '/api/sheets?sheet=productivity',
   revenueToken: '/api/sheets?sheet=revenue-token',
   revenueFull:  '/api/sheets?sheet=revenue-full',
+  cohortTargets: '/api/sheets?sheet=cohort-targets',
 };
 
 const DEFAULT_SHEET_URLS = {
@@ -202,6 +203,8 @@ let revTokenRows = [];
 let revFullRows  = [];
 let revLoaded    = false;
 let revLoading   = false;
+let cohortTargetRows = [];
+let cohortLoaded = false;
 
 function isNonBlank(val) {
   return val != null && String(val).trim() !== '';
@@ -528,6 +531,34 @@ function filteredPayments() { return filterData(DB.payments); }
 // ==========================================
 // AUTH
 // ==========================================
+const SESSION_KEY = 'gm_dashboard_user';
+
+function saveSession(username) {
+  localStorage.setItem(SESSION_KEY, username);
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function getSavedSession() {
+  const username = localStorage.getItem(SESSION_KEY);
+  if (!username) return null;
+  const key = username.trim().toLowerCase();
+  return GM_USERS[key] ? key : null;
+}
+
+function showDashboard() {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('app-layout').style.display = 'grid';
+}
+
+function showLoginScreen() {
+  document.getElementById('app-layout').style.display = 'none';
+  const overlay = document.getElementById('login-overlay');
+  if (overlay) overlay.style.display = 'flex';
+}
+
 function handleLogin() {
   const username = document.getElementById('login-username').value.trim().toLowerCase();
   const password = document.getElementById('login-password').value;
@@ -536,9 +567,9 @@ function handleLogin() {
   if (GM_USERS[username] && GM_USERS[username].password === password) {
     errorEl.classList.remove('show');
     currentUser = username;
+    saveSession(username);
     initDashboard();
-    document.getElementById('login-overlay').style.display = 'none';
-    document.getElementById('app-layout').style.display = 'grid';
+    showDashboard();
   } else {
     errorEl.classList.add('show');
     document.getElementById('login-password').value = '';
@@ -547,7 +578,17 @@ function handleLogin() {
 }
 
 function handleLogout() {
+  clearSession();
   window.location.reload();
+}
+
+function restoreSession() {
+  const username = getSavedSession();
+  if (!username) return false;
+  currentUser = username;
+  initDashboard();
+  showDashboard();
+  return true;
 }
 
 // ==========================================
@@ -778,6 +819,7 @@ function applyFilters() {
       document.getElementById('filter-program').value = 'ALL';
       document.getElementById('filter-tl').value      = 'ALL';
       document.getElementById('filter-bde').value     = 'ALL';
+      if (cohortLoaded) applyCohortDateRangeForFilters();
     } else if (activeFilters.program !== prevProgram) {
       activeFilters.tl  = 'ALL';
       activeFilters.bde = 'ALL';
@@ -785,6 +827,7 @@ function applyFilters() {
       populateRevBDEs('ALL');
       document.getElementById('filter-tl').value  = 'ALL';
       document.getElementById('filter-bde').value = 'ALL';
+      if (cohortLoaded) applyCohortDateRangeForFilters();
     } else if (activeFilters.tl !== prevTL) {
       activeFilters.bde = 'ALL';
       populateRevBDEs(activeFilters.tl);
@@ -960,18 +1003,13 @@ function renderOverview() {
   // 5. Avg Dialled & 6. Avg CC & 7. Avg TT
   if (prodLoaded) {
     const cData = getOverviewProdData();
-    const { calls, connects, talk, activeBdes } = prodAggregate(cData);
-    const dateFrom  = new Date(activeFilters.dateFrom);
-    const dateTo    = new Date(activeFilters.dateTo);
-    const daysCount = Math.max(1, Math.round((dateTo - dateFrom) / (1000 * 60 * 60 * 24)) + 1);
-    const denom     = Math.max(1, activeBdes * daysCount);
-    const avgDialled    = (calls / denom).toFixed(1);
-    const avgConnected  = (connects / denom).toFixed(1);
-    const avgTalkSec    = connects ? Math.round((talk * 60) / connects) : 0;
+    const avgDialled    = prodAvgCall(cData);
+    const avgConnected  = prodAvgCC(cData);
+    const avgTT         = prodAvgTT(cData);
 
     setText('ov-avg-dialled', avgDialled);
     setText('ov-avg-connected', avgConnected);
-    setText('ov-avg-talktime', formatAvgTalk(avgTalkSec));
+    setText('ov-avg-talktime', avgTT);
   } else {
     setText('ov-avg-dialled', '…');
     setText('ov-avg-connected', '…');
@@ -1018,6 +1056,7 @@ function mapTokenRow(obj) {
   return {
     gm:          (obj['GM'] || '').trim(),
     type:        (obj['Type'] || '').trim(),
+    cohortName:  (obj['Cohort Name'] || '').trim(),
     tl:          (obj['TL Name'] || '').trim(),
     bdMail:      (obj['BD Mail'] || '').trim(),
     tokenDate:   parseSheetDate(obj['Token date']),
@@ -1030,12 +1069,325 @@ function mapFullPayRow(obj) {
   return {
     gm:          (obj['GM'] || '').trim(),
     type:        (obj['Type'] || '').trim(),
+    cohortName:  (obj['Cohort Name'] || '').trim(),
     tl:          (obj['TL Name'] || '').trim(),
     bdMail:      (obj['BD Mail'] || '').trim(),
     fullPayDate: parseSheetDate(obj['Full payment date']),
     amountPaid:  parseNum(obj['Amount Paid']),
     candidate:   obj['Candidate name'] || '',
   };
+}
+
+function mapCohortRow(obj) {
+  return {
+    programName:          (obj['Program Name'] || '').trim(),
+    cohortName:           (obj['Cohort Name'] || '').trim(),
+    startDate:            parseSheetDate(obj['Cohort Start Date']),
+    endDate:              parseSheetDate(obj['Cohort End Date']),
+    cohortTarget:         parseNum(obj['Cohort Target']),
+    targetPerMonthPerBDA: parseNum(obj['Target Per Month Per BDA']),
+    targetPerDayPerBDA:   parseNum(obj['Target Per Day Per BDA']),
+  };
+}
+
+// Returns total Cohort Target for a program (directly from sheet column)
+function revCohortTotalTarget(program) {
+  if (!cohortLoaded) return 0;
+  const prog = program ?? activeFilters.program;
+  if (!prog || prog === 'ALL') return 0;
+  const cohort = findCohortTarget(prog);
+  return cohort?.cohortTarget || 0;
+}
+
+// Returns per-day target = Cohort Target / cohort days
+function revCohortPerDayTarget(program) {
+  if (!cohortLoaded) return 0;
+  const prog = program ?? activeFilters.program;
+  if (!prog || prog === 'ALL') return 0;
+  const cohort = findCohortTarget(prog);
+  if (!cohort?.cohortTarget) return 0;
+  const days = cohortDayCount(cohort.startDate, cohort.endDate);
+  return cohort.cohortTarget / days;
+}
+
+// For a set of revenue rows (GM/TL slice), derive Cohort Target by summing
+// the Cohort Target of each unique program present in those rows.
+// Returns { total, perDay } both as floats.
+function revRowsCohortTarget(contextRows) {
+  if (!cohortLoaded || !contextRows?.length) return { total: 0, perDay: 0 };
+  const programs = [...new Set(contextRows.map(r => r.type).filter(Boolean))];
+  let total = 0, perDay = 0;
+  programs.forEach(prog => {
+    const cohort = findCohortTarget(prog);
+    if (!cohort?.cohortTarget) return;
+    total  += cohort.cohortTarget;
+    const days = cohortDayCount(cohort.startDate, cohort.endDate);
+    perDay += cohort.cohortTarget / days;
+  });
+  return { total, perDay };
+}
+
+// For a BDA row slice: Target Per Month Per BDA × (cohort days / 30)
+// Returns { total, perDay } both as floats.
+function revBdaRowsCohortTarget(contextRows) {
+  if (!cohortLoaded || !contextRows?.length) return { total: 0, perDay: 0 };
+  const programs = [...new Set(contextRows.map(r => r.type).filter(Boolean))];
+  let total = 0, perDay = 0;
+  programs.forEach(prog => {
+    const cohort = findCohortTarget(prog);
+    if (!cohort?.targetPerMonthPerBDA) return;
+    const days = cohortDayCount(cohort.startDate, cohort.endDate);
+    total  += cohort.targetPerMonthPerBDA * (days / 30);
+    perDay += cohort.targetPerMonthPerBDA / 30;
+  });
+  return { total, perDay };
+}
+
+// Builds a GM → Set<normTlName> map from the input roster (used for TL proportional targets)
+function buildGmTlCountMap() {
+  const rosterMap = buildInputBdaRosterMap();
+  const gmTls = new Map(); // normGmName → Set of normTlNames
+  for (const entry of rosterMap.values()) {
+    if (!entry.gm || !entry.tl) continue;
+    const gKey = normTeamName(entry.gm);
+    if (!gmTls.has(gKey)) gmTls.set(gKey, new Set());
+    gmTls.get(gKey).add(normTeamName(entry.tl));
+  }
+  return gmTls;
+}
+
+// For a TL row slice: GM Cohort Target ÷ number of TLs under that GM (from input roster)
+// Falls back to revRowsCohortTarget if GM/TL count can't be determined.
+// Accepts a pre-built gmTlCountMap for efficiency (built once per render call).
+function revTlRowsCohortTarget(tlName, contextRows, gmTlCountMap) {
+  if (!cohortLoaded || !contextRows?.length) return { total: 0, perDay: 0 };
+
+  // Find GM for this TL — first from input roster, then from revenue rows
+  const rosterMap = buildInputBdaRosterMap();
+  let gmForTl = '';
+  for (const entry of rosterMap.values()) {
+    if (normTeamName(entry.tl) === normTeamName(tlName) && entry.gm) {
+      gmForTl = entry.gm;
+      break;
+    }
+  }
+  if (!gmForTl) {
+    const revRow = [...revTokenRows, ...revFullRows].find(
+      r => normTeamName(r.tl) === normTeamName(tlName) && r.gm
+    );
+    gmForTl = revRow?.gm || '';
+  }
+  if (!gmForTl) return revRowsCohortTarget(contextRows);
+
+  // Count TLs under this GM
+  const tlSet = gmTlCountMap?.get(normTeamName(gmForTl));
+  const tlCount = tlSet?.size || 1;
+
+  const programs = [...new Set(contextRows.map(r => r.type).filter(Boolean))];
+  let total = 0, perDay = 0;
+  programs.forEach(prog => {
+    const cohort = findCohortTarget(prog);
+    if (!cohort?.cohortTarget) return;
+    total  += cohort.cohortTarget / tlCount;
+    const days = cohortDayCount(cohort.startDate, cohort.endDate);
+    perDay += (cohort.cohortTarget / days) / tlCount;
+  });
+  return { total, perDay };
+}
+
+function findCohortTarget(programName, cohortName) {
+  if (!programName) return null;
+  const matches = cohortTargetRows.filter(r => r.programName === programName);
+  if (!matches.length) return null;
+  if (cohortName) {
+    const exact = matches.find(r => r.cohortName === cohortName);
+    if (exact) return exact;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const active = matches.find(r => r.startDate <= today && r.endDate >= today);
+  return active || matches[0];
+}
+
+function cohortDayCount(startDate, endDate) {
+  if (!startDate || !endDate) return 1;
+  const start = new Date(startDate + 'T00:00:00');
+  const end   = new Date(endDate + 'T00:00:00');
+  return Math.max(1, Math.round((end - start) / 86400000) + 1);
+}
+
+// Input sheet (productivity + leads) — BDA → TL → GM roster for target mapping only
+function normTeamName(name) {
+  return (name || '').trim().toLowerCase();
+}
+
+function buildInputBdaRosterMap() {
+  const map = new Map();
+  const add = (bda, tl, gm, date) => {
+    if (!bda) return;
+    const key = bda.trim().toLowerCase();
+    const tlName = (tl || '').trim();
+    const gmName = (gm || '').trim();
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { bda: bda.trim(), tl: tlName, gm: gmName, date: date || '' });
+      return;
+    }
+    if ((!existing.tl || !existing.gm) && tlName && gmName) {
+      map.set(key, { bda: bda.trim(), tl: tlName, gm: gmName, date: date || existing.date });
+      return;
+    }
+    if (date && date >= existing.date && (tlName || gmName)) {
+      map.set(key, {
+        bda: bda.trim(),
+        tl: tlName || existing.tl,
+        gm: gmName || existing.gm,
+        date,
+      });
+    }
+  };
+
+  if (prodLoaded) {
+    prodAllRows.forEach(r => add(r.owner, r.manager, r.gm, r.date));
+  }
+  if (laLoaded) {
+    laAllRows.forEach(r => add(r.owner, r.tl, r.gm, r.createdOn));
+  }
+  return map;
+}
+
+function getRevenueBdaEmails(scope = {}) {
+  const gm  = scope.gm  !== undefined ? scope.gm  : activeFilters.gm;
+  const tl  = scope.tl  !== undefined ? scope.tl  : activeFilters.tl;
+  const bde = scope.bde !== undefined ? scope.bde : activeFilters.bde;
+  const program = scope.program ?? activeFilters.program;
+
+  let pool = [...revTokenRows, ...revFullRows];
+  if (gm !== 'ALL') pool = pool.filter(r => r.gm === gm);
+  if (tl !== 'ALL') pool = pool.filter(r => normTeamName(r.tl) === normTeamName(tl));
+  if (program !== 'ALL') pool = pool.filter(r => r.type === program);
+  if (bde !== 'ALL') pool = pool.filter(r => inputBdaMatchesFilter(r.bdMail, bde));
+  return [...new Set(pool.map(r => r.bdMail).filter(Boolean))];
+}
+
+function getTargetBdaCount(scope = {}) {
+  const roster = getInputBdaRoster(scope);
+  if (roster.length) return roster.length;
+
+  const inputMap = buildInputBdaRosterMap();
+  const revEmails = getRevenueBdaEmails(scope);
+  if (revEmails.length) {
+    const inInput = revEmails.filter(e => inputMap.has(e.toLowerCase()));
+    return inInput.length || revEmails.length;
+  }
+
+  if (scope.bde && scope.bde !== 'ALL') return 1;
+  return 0;
+}
+
+function revResolveTargetProgram(scope, contextRows) {
+  const program = scope.program ?? activeFilters.program;
+  if (program !== 'ALL') return program;
+  const counts = {};
+  (contextRows || []).forEach(r => {
+    const p = (r.type || '').trim();
+    if (p) counts[p] = (counts[p] || 0) + 1;
+  });
+  let top = '';
+  let max = 0;
+  for (const [p, c] of Object.entries(counts)) {
+    if (c > max) { max = c; top = p; }
+  }
+  return top || (cohortTargetRows[0]?.programName || '');
+}
+
+function revTargetPerDay(scope = {}) {
+  if (!cohortLoaded || !cohortTargetRows.length) return 0;
+
+  const program = revResolveTargetProgram(scope, scope.contextRows);
+  if (!program) return 0;
+
+  const cohort = findCohortTarget(program, scope.cohortName);
+  if (!cohort?.targetPerDayPerBDA) return 0;
+
+  const bdaCount = getTargetBdaCount({ ...scope, program });
+  if (!bdaCount) return 0;
+
+  return cohort.targetPerDayPerBDA * bdaCount;
+}
+
+function revTargetFullPayments(scope = {}) {
+  if (!cohortLoaded || !cohortTargetRows.length) return 0;
+
+  const program = revResolveTargetProgram(scope, scope.contextRows);
+  if (!program) return 0;
+
+  const cohort = findCohortTarget(program, scope.cohortName);
+  if (!cohort?.targetPerDayPerBDA) return 0;
+
+  const bdaCount = getTargetBdaCount({ ...scope, program });
+  if (!bdaCount) return 0;
+
+  const days = cohortDayCount(cohort.startDate, cohort.endDate);
+  return cohort.targetPerDayPerBDA * bdaCount * days;
+}
+
+function inputBdaMatchesFilter(bda, filterBde) {
+  if (!filterBde || filterBde === 'ALL') return true;
+  const bdaLower = (bda || '').trim().toLowerCase();
+  const filterLower = filterBde.trim().toLowerCase();
+  if (bdaLower === filterLower) return true;
+  if (filterBde.includes('@')) {
+    return bdaLower === filterLower || emailToDisplayName(filterBde).toLowerCase() === emailToDisplayName(bda).toLowerCase();
+  }
+  return emailToDisplayName(bda).toLowerCase() === filterLower || bdaLower === filterLower;
+}
+
+function getInputBdaRoster(scope = {}) {
+  const rosterMap = buildInputBdaRosterMap();
+  const gm  = scope.gm  !== undefined ? scope.gm  : activeFilters.gm;
+  const tl  = scope.tl  !== undefined ? scope.tl  : activeFilters.tl;
+  const bde = scope.bde !== undefined ? scope.bde : activeFilters.bde;
+
+  let list = [...rosterMap.values()];
+  if (gm === 'ALL') list = list.filter(r => isGMAllowed(r.gm));
+  else list = list.filter(r => r.gm === gm);
+  if (tl !== 'ALL') list = list.filter(r => normTeamName(r.tl) === normTeamName(tl));
+  if (bde !== 'ALL') list = list.filter(r => inputBdaMatchesFilter(r.bda, bde));
+  return list;
+}
+
+function formatTargetNum(n) {
+  return Number.isInteger(n) ? fNum(n) : n.toFixed(1);
+}
+
+function applyCohortDateRangeForFilters() {
+  if (!cohortLoaded || !cohortTargetRows.length) return false;
+
+  let startDate = '';
+  let endDate   = '';
+
+  if (activeFilters.program !== 'ALL') {
+    const cohort = findCohortTarget(activeFilters.program);
+    if (!cohort) return false;
+    startDate = cohort.startDate;
+    endDate   = cohort.endDate;
+  } else {
+    const starts = cohortTargetRows.map(r => r.startDate).filter(Boolean).sort();
+    const ends   = cohortTargetRows.map(r => r.endDate).filter(Boolean).sort();
+    if (!starts.length) return false;
+    startDate = starts[0];
+    endDate   = ends[ends.length - 1];
+  }
+
+  if (!startDate || !endDate) return false;
+
+  activeFilters.dateFrom = startDate;
+  activeFilters.dateTo   = endDate;
+  const dateFromEl = document.getElementById('date-from');
+  const dateToEl   = document.getElementById('date-to');
+  if (dateFromEl) dateFromEl.value = startDate;
+  if (dateToEl)   dateToEl.value   = endDate;
+  return true;
 }
 
 function revMatchesFilters(row, dateField) {
@@ -1080,6 +1432,14 @@ function revAggFull(rows) {
   };
 }
 
+function revBookingBreakup(tokenCount, fullCount) {
+  const parts = [];
+  if (tokenCount > 0) parts.push(`${fNum(tokenCount)} Token`);
+  if (fullCount > 0) parts.push(`${fNum(fullCount)} Full`);
+  if (parts.length === 0) return '0 bookings';
+  return parts.join(' and ');
+}
+
 function populateRevGlobalFilters() {
   const gmSel = document.getElementById('filter-gm');
   if (gmSel) {
@@ -1121,7 +1481,10 @@ function populateRevPrograms() {
   if (!sel) return;
   let pool = revTokenRows;
   if (activeFilters.gm !== 'ALL') pool = pool.filter(r => r.gm === activeFilters.gm);
-  const types = [...new Set(pool.map(r => r.type).filter(Boolean))].sort();
+  const types = [...new Set([
+    ...pool.map(r => r.type).filter(Boolean),
+    ...cohortTargetRows.map(r => r.programName).filter(Boolean),
+  ])].sort();
   sel.innerHTML = '<option value="ALL">All Programs</option>';
   types.forEach(t => {
     const opt = document.createElement('option');
@@ -1170,15 +1533,26 @@ function populateRevBDEs(tlName) {
   sel.value = activeFilters.bde;
 }
 
+async function ensureInputMappingLoaded() {
+  if (prodLoaded) return;
+  if (prodLoading) {
+    while (prodLoading) await new Promise(r => setTimeout(r, 50));
+    return;
+  }
+  await fetchProductivityCSV();
+}
+
 async function fetchRevenueCSV() {
   if (revLoading) return;
   revLoading = true;
   setText('rev-total', '…');
   if (activeView === 'overview') setText('ov-revenue', '…');
   try {
-    const [tokenResp, fullResp] = await Promise.all([
+    const [tokenResp, fullResp, cohortResp] = await Promise.all([
       fetch(SHEETS_API.revenueToken),
-      fetch(SHEETS_API.revenueFull)
+      fetch(SHEETS_API.revenueFull),
+      fetch(SHEETS_API.cohortTargets),
+      ensureInputMappingLoaded(),
     ]);
     if (!tokenResp.ok) throw new Error(`Token CSV HTTP ${tokenResp.status}`);
     if (!fullResp.ok)  throw new Error(`Full Payment CSV HTTP ${fullResp.status}`);
@@ -1187,18 +1561,31 @@ async function fetchRevenueCSV() {
     const fullRaw  = parseCSV(await fullResp.text());
     revTokenRows = tokenRaw.map(mapTokenRow).filter(r => r.tokenDate);
     revFullRows  = fullRaw.map(mapFullPayRow).filter(r => r.fullPayDate || r.amountPaid > 0);
+
+    if (cohortResp.ok) {
+      cohortTargetRows = parseCSV(await cohortResp.text())
+        .map(mapCohortRow)
+        .filter(r => r.programName && r.startDate && r.endDate);
+      cohortLoaded = true;
+    } else {
+      cohortTargetRows = [];
+      cohortLoaded = false;
+    }
+
     revLoaded = true;
     allowedGMsCache = null;
 
     if (activeView === 'revenue' || activeView === 'overview') {
-      const dates = revTokenRows.map(r => r.tokenDate).filter(Boolean).sort();
-      if (dates.length) {
-        activeFilters.dateFrom = dates[0];
-        activeFilters.dateTo   = dates[dates.length - 1];
-        const dateFromEl = document.getElementById('date-from');
-        const dateToEl   = document.getElementById('date-to');
-        if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
-        if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+      if (!applyCohortDateRangeForFilters()) {
+        const dates = revTokenRows.map(r => r.tokenDate).filter(Boolean).sort();
+        if (dates.length) {
+          activeFilters.dateFrom = dates[0];
+          activeFilters.dateTo   = dates[dates.length - 1];
+          const dateFromEl = document.getElementById('date-from');
+          const dateToEl   = document.getElementById('date-to');
+          if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
+          if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+        }
       }
       populateRevGlobalFilters();
       renderActiveView();
@@ -1217,6 +1604,8 @@ function renderRevenue() {
     fetchRevenueCSV();
     return;
   }
+  if (!prodLoaded && !prodLoading) ensureInputMappingLoaded().then(() => renderRevenue());
+  if (!prodLoaded) return;
 
   const tokenData = getBaseRevTokens();
   const fullData  = getBaseRevFullPayments();
@@ -1235,8 +1624,18 @@ function renderRevenue() {
   setText('rev-full-sub', `${fullCount} full payment${fullCount !== 1 ? 's' : ''}`);
   setText('rev-tokens', fCurrency(tokenRev));
   setText('rev-tokens-sub', `${tokenCount} token booking${tokenCount !== 1 ? 's' : ''}`);
-  setText('rev-target-pct', '—');
-  setText('rev-target-sub', 'No target in sheet');
+
+  const targetFull = revCohortTotalTarget();
+  const achievedFull = fullAgg.count;
+  if (cohortLoaded && targetFull > 0) {
+    const targetPct = Math.min(999, (achievedFull / targetFull) * 100);
+    const perDay = revCohortPerDayTarget();
+    setText('rev-target-pct', `${targetPct.toFixed(1)}%`);
+    setText('rev-target-sub', `${fNum(achievedFull)} of ${formatTargetNum(targetFull)} full${perDay ? ` · ${formatTargetNum(perDay)}/day` : ''}`);
+  } else {
+    setText('rev-target-pct', '—');
+    setText('rev-target-sub', cohortLoaded ? 'Select a program for target' : 'Loading targets…');
+  }
 
   // Target (Unit wise) — grouped by Type (Program)
   const targetUnitsContainer = document.getElementById('rev-target-units');
@@ -1250,19 +1649,32 @@ function renderRevenue() {
   types.forEach((type, idx) => {
     const tRows = tokenData.filter(r => r.type === type);
     const fRows = fullData.filter(r => r.type === type);
-    const achieved = revAggTokens(tRows).amount + revAggFull(fRows).amount;
+    const tAgg = revAggTokens(tRows);
+    const fAgg = revAggFull(fRows);
+    const achieved = tAgg.amount + fAgg.amount;
+    const cohort = findCohortTarget(type);
+    const progTarget  = cohort?.cohortTarget || 0;
+    const progPerDay  = progTarget && cohort
+      ? progTarget / cohortDayCount(cohort.startDate, cohort.endDate)
+      : 0;
+    const progPct = progTarget ? Math.min(100, (fAgg.count / progTarget) * 100) : 0;
+    const cohortDates = cohort ? `${cohort.startDate} → ${cohort.endDate}` : '';
     const accentClass = idx % 3 === 0 ? 'accent-indigo' : idx % 3 === 1 ? 'accent-emerald' : 'accent-purple';
     const card = document.createElement('div');
     card.className = `target-card ${accentClass}`;
     card.innerHTML = `
       <div class="target-card-header">
         <span class="target-card-title">${type}</span>
-        <span class="target-card-sub">Token: ${fCurrency(revAggTokens(tRows).amount)} · Full: ${fCurrency(revAggFull(fRows).amount)}</span>
+        <span class="target-card-sub">Token: ${fCurrency(tAgg.amount)} · Full: ${fCurrency(fAgg.amount)}${cohortDates ? ` · ${cohortDates}` : ''}</span>
       </div>
       <div class="target-progress-wrap">
+        ${progTarget ? `
+        <div class="target-progress-bar">
+          <div class="target-progress-fill" style="width: ${progPct.toFixed(1)}%"></div>
+        </div>` : ''}
         <div class="target-progress-stats">
           <span>Total: ${fCurrency(achieved)}</span>
-          <span>${fNum(tRows.length + fRows.length)} bookings</span>
+          <span>${revBookingBreakup(tAgg.count, fAgg.count)}${progTarget ? ` · Target: ${formatTargetNum(progTarget)} full (${formatTargetNum(progPerDay)}/day)` : ''}</span>
         </div>
       </div>
     `;
@@ -1291,29 +1703,23 @@ function renderRevenue() {
   setText('rev-input-rev-dial',  fCurrency(totalCalls ? Math.round(totalRev / totalCalls) : 0));
   setText('rev-input-rev-talk',  fCurrency(talkMins ? Math.round(totalRev / talkMins) : 0));
 
-  // Top 3 BDAs by total revenue
+  // Top 3 BDAs by token count
   const bdaPodiumContainer = document.getElementById('rev-podium-bdas');
   bdaPodiumContainer.innerHTML = '';
-  const bdeMap = {};
+  const podiumBdeMap = {};
   tokenData.forEach(r => {
     if (!r.bdMail) return;
-    if (!bdeMap[r.bdMail]) bdeMap[r.bdMail] = { tokens: [], full: [], type: r.type };
-    bdeMap[r.bdMail].tokens.push(r);
-    if (r.type) bdeMap[r.bdMail].type = r.type;
-  });
-  fullData.forEach(r => {
-    if (!r.bdMail) return;
-    if (!bdeMap[r.bdMail]) bdeMap[r.bdMail] = { tokens: [], full: [], type: r.type };
-    bdeMap[r.bdMail].full.push(r);
+    if (!podiumBdeMap[r.bdMail]) podiumBdeMap[r.bdMail] = { tokens: [], type: r.type };
+    podiumBdeMap[r.bdMail].tokens.push(r);
+    if (r.type) podiumBdeMap[r.bdMail].type = r.type;
   });
 
-  const bdaRankings = Object.keys(bdeMap).map(bd => {
-    const tAmt = revAggTokens(bdeMap[bd].tokens).amount;
-    const fAmt = revAggFull(bdeMap[bd].full).amount;
-    return { bd, revenue: tAmt + fAmt, type: bdeMap[bd].type || '—' };
-  }).sort((a, b) => b.revenue - a.revenue);
+  const bdaRankings = Object.keys(podiumBdeMap).map(bd => {
+    const tokenCount = revAggTokens(podiumBdeMap[bd].tokens).count;
+    return { bd, tokenCount, type: podiumBdeMap[bd].type || '—' };
+  }).sort((a, b) => b.tokenCount - a.tokenCount);
 
-  const topBDAs = bdaRankings.filter(b => b.revenue > 0).slice(0, 3);
+  const topBDAs = bdaRankings.filter(b => b.tokenCount > 0).slice(0, 3);
   if (topBDAs.length > 0) {
     topBDAs.forEach((bda, index) => {
       const card = document.createElement('div');
@@ -1324,12 +1730,12 @@ function renderRevenue() {
           <div class="podium-bda-name" title="${bda.bd}">${emailToDisplayName(bda.bd)}</div>
         </div>
         <div class="podium-bda-program">${bda.type}</div>
-        <div class="podium-bda-rev">${fCurrency(bda.revenue)}</div>
+        <div class="podium-bda-rev">${fNum(bda.tokenCount)} Token${bda.tokenCount !== 1 ? 's' : ''}</div>
       `;
       bdaPodiumContainer.appendChild(card);
     });
   } else {
-    bdaPodiumContainer.innerHTML = '<div class="empty-row" style="width: 100%">No revenue data for BDAs in this period</div>';
+    bdaPodiumContainer.innerHTML = '<div class="empty-row" style="width: 100%">No token data for BDAs in this period</div>';
   }
 
   // GM Performance
@@ -1340,14 +1746,16 @@ function renderRevenue() {
     : [activeFilters.gm];
 
   gmNames.forEach(gmName => {
+    const gmRows = [...tokenData, ...fullData].filter(r => r.gm === gmName);
     const gmTokens = revAggTokens(tokenData.filter(r => r.gm === gmName));
     const gmFull   = revAggFull(fullData.filter(r => r.gm === gmName));
+    const { total: gmTarget, perDay: gmTargetDay } = revRowsCohortTarget(gmRows);
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="bold">${gmName}</td>
-      <td class="mono">—</td>
-      <td class="mono">${fCurrency(gmTokens.amount)}</td>
-      <td class="mono">${fCurrency(gmFull.amount)}</td>
+      <td class="col-name bold">${gmName}</td>
+      <td class="col-num" title="${gmTarget ? `${formatTargetNum(gmTargetDay)}/day` : ''}">${gmTarget ? formatTargetNum(gmTarget) : '—'}</td>
+      <td class="col-num">${fNum(gmTokens.count)}</td>
+      <td class="col-num">${fNum(gmFull.count)}</td>
     `;
     gmTbody.appendChild(tr);
   });
@@ -1357,16 +1765,19 @@ function renderRevenue() {
   const tlTbody = document.getElementById('rev-tl-perf-table');
   tlTbody.innerHTML = '';
   const tlNames = [...new Set([...tokenData, ...fullData].map(r => r.tl).filter(Boolean))].sort();
+  const gmTlCountMap = (cohortLoaded && prodLoaded) ? buildGmTlCountMap() : null;
   tlNames.forEach(tlName => {
-    const tlTokens = revAggTokens(tokenData.filter(r => r.tl === tlName));
-    const tlFull   = revAggFull(fullData.filter(r => r.tl === tlName));
+    const tlRows = [...tokenData, ...fullData].filter(r => normTeamName(r.tl) === normTeamName(tlName));
+    const tlTokens = revAggTokens(tokenData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
+    const tlFull   = revAggFull(fullData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
     if (tlTokens.count === 0 && tlFull.count === 0) return;
+    const { total: tlTarget, perDay: tlTargetDay } = revTlRowsCohortTarget(tlName, tlRows, gmTlCountMap);
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="bold">${tlName}</td>
-      <td class="mono">—</td>
-      <td class="mono">${fCurrency(tlTokens.amount)}</td>
-      <td class="mono">${fCurrency(tlFull.amount)}</td>
+      <td class="col-name bold">${tlName}</td>
+      <td class="col-num" title="${tlTarget ? `${formatTargetNum(tlTargetDay)}/day` : ''}">${tlTarget ? formatTargetNum(tlTarget) : '—'}</td>
+      <td class="col-num">${fNum(tlTokens.count)}</td>
+      <td class="col-num">${fNum(tlFull.count)}</td>
     `;
     tlTbody.appendChild(tr);
   });
@@ -1375,15 +1786,28 @@ function renderRevenue() {
   // BDA Performance
   const bdaTbody = document.getElementById('rev-bda-table');
   bdaTbody.innerHTML = '';
+  const bdeMap = {};
+  tokenData.forEach(r => {
+    if (!r.bdMail) return;
+    if (!bdeMap[r.bdMail]) bdeMap[r.bdMail] = { tokens: [], full: [] };
+    bdeMap[r.bdMail].tokens.push(r);
+  });
+  fullData.forEach(r => {
+    if (!r.bdMail) return;
+    if (!bdeMap[r.bdMail]) bdeMap[r.bdMail] = { tokens: [], full: [] };
+    bdeMap[r.bdMail].full.push(r);
+  });
   Object.keys(bdeMap).sort().forEach(bd => {
-    const tAmt = revAggTokens(bdeMap[bd].tokens);
-    const fAmt = revAggFull(bdeMap[bd].full);
+    const tAgg = revAggTokens(bdeMap[bd].tokens);
+    const fAgg = revAggFull(bdeMap[bd].full);
+    const bdeRows = [...bdeMap[bd].tokens, ...bdeMap[bd].full];
+    const { total: bdeTarget, perDay: bdeTargetDay } = revBdaRowsCohortTarget(bdeRows);
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="bold">${bd}</td>
-      <td class="mono">—</td>
-      <td class="mono">${fCurrency(tAmt.amount)}</td>
-      <td class="mono">${fCurrency(fAmt.amount)}</td>
+      <td class="col-name bold" title="${bd}">${bd}</td>
+      <td class="col-num" title="${bdeTarget ? `${formatTargetNum(bdeTargetDay)}/day` : ''}">${bdeTarget ? formatTargetNum(bdeTarget) : '—'}</td>
+      <td class="col-num">${fNum(tAgg.count)}</td>
+      <td class="col-num">${fNum(fAgg.count)}</td>
     `;
     bdaTbody.appendChild(tr);
   });
@@ -1422,13 +1846,13 @@ function renderRevenue() {
       const formattedDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric'
       });
-      const tokenDisplay  = info.tokens  > 0 ? `${info.tokens} (${fCurrency(info.tokenAmt)})`  : '0';
-      const enrollDisplay = info.enrolls > 0 ? `${info.enrolls} (${fCurrency(info.enrollAmt)})` : '0';
+      const tokenDisplay  = fNum(info.tokens);
+      const enrollDisplay = fNum(info.enrolls);
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="bold">${formattedDate}</td>
-        <td class="mono">${tokenDisplay}</td>
-        <td class="mono">${enrollDisplay}</td>
+        <td class="col-name bold">${formattedDate}</td>
+        <td class="col-num">${tokenDisplay}</td>
+        <td class="col-num">${enrollDisplay}</td>
       `;
       dateTbody.appendChild(tr);
     }
@@ -1628,13 +2052,37 @@ function prodAggregate(rows) {
   return { calls, connects, uniqueDialled, talk, activeBdes };
 }
 
-function prodCPL(totalCalls, uniqueDialled) {
-  return uniqueDialled ? (totalCalls / uniqueDialled).toFixed(2) : '—';
+// LS working days: each owner-date with at least 1 call counts as 1
+function prodWorkingDaysCount(rows) {
+  const days = new Set();
+  rows.forEach(r => {
+    if (r.calls > 0 && r.date && r.owner) {
+      days.add(`${r.owner}|${r.date}`);
+    }
+  });
+  return days.size;
 }
 
-function formatAvgTalk(sec) {
-  if (sec >= 60) return `${Math.floor(sec / 60)}m ${sec % 60}s`;
-  return `${sec}s`;
+function prodAvgCall(rows) {
+  const totalCalls = rows.reduce((s, r) => s + r.calls, 0);
+  const workingDays = prodWorkingDaysCount(rows);
+  return workingDays ? (totalCalls / workingDays).toFixed(1) : '0.0';
+}
+
+function prodAvgCC(rows) {
+  const totalConnects = rows.reduce((s, r) => s + r.connected, 0);
+  const workingDays = prodWorkingDaysCount(rows);
+  return workingDays ? (totalConnects / workingDays).toFixed(1) : '0.0';
+}
+
+function prodAvgTT(rows) {
+  const totalTalkMin = rows.reduce((s, r) => s + r.talkTimeMin, 0);
+  const workingDays = prodWorkingDaysCount(rows);
+  return workingDays ? formatTalkHrs(totalTalkMin / workingDays) : '0.0h';
+}
+
+function prodCPL(totalCalls, uniqueDialled) {
+  return uniqueDialled ? (totalCalls / uniqueDialled).toFixed(2) : '—';
 }
 
 function formatTalkHrs(minutes) {
@@ -1668,10 +2116,6 @@ function renderProductivity() {
   setText('prod-talk-sub',    `Avg ${avgTalkSec}s per connect`);
   setText('prod-active',      `${activeBDEs}/${totalBDEs || activeBDEs}`);
   setText('prod-active-sub',  `active in period`);
-
-  const dateFrom  = new Date(activeFilters.dateFrom);
-  const dateTo    = new Date(activeFilters.dateTo);
-  const daysCount = Math.max(1, Math.round((dateTo - dateFrom) / (1000 * 60 * 60 * 24)) + 1);
 
   // Top 3 BDAs by Total Talk Time (TT)
   const bdaPodiumContainer = document.getElementById('prod-podium-bdas');
@@ -1720,23 +2164,22 @@ function renderProductivity() {
   gmNames.forEach(gmName => {
     const gmRows = cData.filter(r => r.gm === gmName);
     if (gmRows.length === 0) return;
-    const { calls: gmDials, connects: gmConnects, uniqueDialled: gmUnique, talk: gmTalk, activeBdes: gmActiveBdes } = prodAggregate(gmRows);
-    const denom = Math.max(1, gmActiveBdes * daysCount);
-    const gmAvgCall = (gmDials / denom).toFixed(1);
-    const gmAvgCC   = (gmConnects / denom).toFixed(1);
-    const gmAvgSec  = gmConnects ? Math.round((gmTalk * 60) / gmConnects) : 0;
+    const { calls: gmDials, connects: gmConnects, uniqueDialled: gmUnique, talk: gmTalk } = prodAggregate(gmRows);
+    const gmAvgCall = prodAvgCall(gmRows);
+    const gmAvgCC   = prodAvgCC(gmRows);
+    const gmAvgTT   = prodAvgTT(gmRows);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="bold">${gmName}</td>
-      <td class="mono">${fNum(gmDials)}</td>
-      <td class="mono">${fNum(gmConnects)}</td>
-      <td class="mono">${fNum(gmUnique)}</td>
-      <td class="mono">${prodCPL(gmDials, gmUnique)}</td>
-      <td class="mono">${formatTalkHrs(gmTalk)}</td>
-      <td class="mono">${gmAvgCall}</td>
-      <td class="mono">${gmAvgCC}</td>
-      <td class="mono">${formatAvgTalk(gmAvgSec)}</td>
+      <td class="col-name bold">${gmName}</td>
+      <td class="col-num">${fNum(gmDials)}</td>
+      <td class="col-num">${fNum(gmConnects)}</td>
+      <td class="col-num">${fNum(gmUnique)}</td>
+      <td class="col-num">${prodCPL(gmDials, gmUnique)}</td>
+      <td class="col-num">${formatTalkHrs(gmTalk)}</td>
+      <td class="col-num">${gmAvgCall}</td>
+      <td class="col-num">${gmAvgCC}</td>
+      <td class="col-num">${gmAvgTT}</td>
     `;
     gmTbody.appendChild(tr);
   });
@@ -1754,23 +2197,22 @@ function renderProductivity() {
 
   Object.keys(tlMap).sort().forEach(tlName => {
     const tlRows = tlMap[tlName];
-    const { calls: tlDials, connects: tlConnects, uniqueDialled: tlUnique, talk: tlTalk, activeBdes: tlActiveBdes } = prodAggregate(tlRows);
-    const denom = Math.max(1, tlActiveBdes * daysCount);
-    const tlAvgCall = (tlDials / denom).toFixed(1);
-    const tlAvgCC   = (tlConnects / denom).toFixed(1);
-    const tlAvgSec  = tlConnects ? Math.round((tlTalk * 60) / tlConnects) : 0;
+    const { calls: tlDials, connects: tlConnects, uniqueDialled: tlUnique, talk: tlTalk } = prodAggregate(tlRows);
+    const tlAvgCall = prodAvgCall(tlRows);
+    const tlAvgCC   = prodAvgCC(tlRows);
+    const tlAvgTT   = prodAvgTT(tlRows);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="bold">${tlName}</td>
-      <td class="mono">${fNum(tlDials)}</td>
-      <td class="mono">${fNum(tlConnects)}</td>
-      <td class="mono">${fNum(tlUnique)}</td>
-      <td class="mono">${prodCPL(tlDials, tlUnique)}</td>
-      <td class="mono">${formatTalkHrs(tlTalk)}</td>
-      <td class="mono">${tlAvgCall}</td>
-      <td class="mono">${tlAvgCC}</td>
-      <td class="mono">${formatAvgTalk(tlAvgSec)}</td>
+      <td class="col-name bold">${tlName}</td>
+      <td class="col-num">${fNum(tlDials)}</td>
+      <td class="col-num">${fNum(tlConnects)}</td>
+      <td class="col-num">${fNum(tlUnique)}</td>
+      <td class="col-num">${prodCPL(tlDials, tlUnique)}</td>
+      <td class="col-num">${formatTalkHrs(tlTalk)}</td>
+      <td class="col-num">${tlAvgCall}</td>
+      <td class="col-num">${tlAvgCC}</td>
+      <td class="col-num">${tlAvgTT}</td>
     `;
     tlTbody.appendChild(tr);
   });
@@ -1783,21 +2225,21 @@ function renderProductivity() {
   Object.keys(bdeMap).sort().forEach(owner => {
     const bdeRows = bdeMap[owner];
     const { calls: dials, connects, uniqueDialled, talk } = prodAggregate(bdeRows);
-    const bdeAvgCall = (dials / daysCount).toFixed(1);
-    const bdeAvgCC   = (connects / daysCount).toFixed(1);
-    const bdeAvgSec  = connects ? Math.round((talk * 60) / connects) : 0;
+    const bdeAvgCall = prodAvgCall(bdeRows);
+    const bdeAvgCC   = prodAvgCC(bdeRows);
+    const bdeAvgTT   = prodAvgTT(bdeRows);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="bold">${owner}</td>
-      <td class="mono">${fNum(dials)}</td>
-      <td class="mono">${fNum(connects)}</td>
-      <td class="mono">${fNum(uniqueDialled)}</td>
-      <td class="mono">${prodCPL(dials, uniqueDialled)}</td>
-      <td class="mono">${formatTalkHrs(talk)}</td>
-      <td class="mono">${bdeAvgCall}</td>
-      <td class="mono">${bdeAvgCC}</td>
-      <td class="mono">${formatAvgTalk(bdeAvgSec)}</td>
+      <td class="col-name bold">${owner}</td>
+      <td class="col-num">${fNum(dials)}</td>
+      <td class="col-num">${fNum(connects)}</td>
+      <td class="col-num">${fNum(uniqueDialled)}</td>
+      <td class="col-num">${prodCPL(dials, uniqueDialled)}</td>
+      <td class="col-num">${formatTalkHrs(talk)}</td>
+      <td class="col-num">${bdeAvgCall}</td>
+      <td class="col-num">${bdeAvgCC}</td>
+      <td class="col-num">${bdeAvgTT}</td>
     `;
     bdaTbody.appendChild(tr);
   });
@@ -1833,6 +2275,130 @@ function lrConvPct(enrolled, total) {
   return total ? ((enrolled / total) * 100).toFixed(2) : '0.00';
 }
 
+function lrFormatStageLabel(stage) {
+  return stage === '(blank)' ? '(blank)' : stage.replace(/_/g, ' ');
+}
+
+function lrGetUniqueStages(rows) {
+  const stageMap = {};
+  rows.forEach(r => {
+    const stage = (r.finalStage || '').trim() || '(blank)';
+    stageMap[stage] = (stageMap[stage] || 0) + 1;
+  });
+  return Object.keys(stageMap).sort((a, b) => stageMap[b] - stageMap[a]);
+}
+
+function lrCountStages(rows) {
+  const counts = {};
+  rows.forEach(r => {
+    const stage = (r.finalStage || '').trim() || '(blank)';
+    counts[stage] = (counts[stage] || 0) + 1;
+  });
+  return counts;
+}
+
+function lrStickyClass(index, stickyCount) {
+  if (index >= stickyCount) return '';
+  const n = index + 1;
+  const last = n === stickyCount ? ' sticky-col-last' : '';
+  return `sticky-col sticky-col-${n}${last}`;
+}
+
+function lrStickyTh(label, index, stickyCount, typeClass) {
+  const cls = [lrStickyClass(index, stickyCount), typeClass].filter(Boolean).join(' ');
+  return `<th class="${cls}">${label}</th>`;
+}
+
+function lrStickyTd(content, index, stickyCount, typeClass) {
+  const cls = [lrStickyClass(index, stickyCount), typeClass].filter(Boolean).join(' ');
+  return `<td class="${cls}">${content}</td>`;
+}
+
+function lrStageColWidth(stage) {
+  const label = lrFormatStageLabel(stage);
+  return Math.max(100, Math.min(176, label.length * 8 + 32));
+}
+
+function lrTextColWidth() {
+  return 260;
+}
+
+function lrApplyColgroup(table, stages, hasTextCol, textColWidth) {
+  if (!table) return;
+  const NAME_W = 168;
+  const TOTAL_W = 104;
+  const TEXT_W = textColWidth || 220;
+  const TAIL_W = [88, 88, 120, 140];
+  const stageWidths = stages.map(s => lrStageColWidth(s));
+
+  let cg = table.querySelector('colgroup');
+  if (!cg) {
+    cg = document.createElement('colgroup');
+    table.insertBefore(cg, table.firstChild);
+  }
+  cg.innerHTML = '';
+  const addCol = (w) => {
+    const col = document.createElement('col');
+    col.style.width = `${w}px`;
+    col.width = w;
+    cg.appendChild(col);
+  };
+
+  addCol(NAME_W);
+  addCol(TOTAL_W);
+  if (hasTextCol) addCol(TEXT_W);
+  stageWidths.forEach(w => addCol(w));
+  TAIL_W.forEach(w => addCol(w));
+
+  const totalW = NAME_W + TOTAL_W
+    + (hasTextCol ? TEXT_W : 0)
+    + stageWidths.reduce((s, w) => s + w, 0)
+    + TAIL_W.reduce((s, w) => s + w, 0);
+
+  table.style.width = `${totalW}px`;
+  table.style.setProperty('--sticky-col-1-width', `${NAME_W}px`);
+  table.style.setProperty('--sticky-col-2-width', `${TOTAL_W}px`);
+  if (hasTextCol) {
+    table.style.setProperty('--col-text-width', `${TEXT_W}px`);
+  }
+}
+
+function lrBuildSummaryThead(fixedHeaders, stages, stickyCount, extraHeader) {
+  const typeClasses = ['col-name', 'col-num'];
+  const fixedHtml = fixedHeaders.map((h, i) => lrStickyTh(h.label, i, stickyCount, typeClasses[i] || 'col-num')).join('');
+  const extraHtml = extraHeader ? `<th class="col-text">${extraHeader}</th>` : '';
+  const stageHeaders = stages.map(s => {
+    const label = lrFormatStageLabel(s);
+    return `<th class="col-num" title="${label}">${label}</th>`;
+  }).join('');
+  const tailHeaders = `
+    <th class="col-num">Token</th>
+    <th class="col-num">Enrolled</th>
+    <th class="col-pct">Token Conversion %</th>
+    <th class="col-pct">Enrollment Conversion %</th>
+  `;
+  return `<tr>${fixedHtml}${extraHtml}${stageHeaders}${tailHeaders}</tr>`;
+}
+
+function lrStageHeaderHtml(stages) {
+  return stages.map(s => `<th>${lrFormatStageLabel(s)}</th>`).join('');
+}
+
+function lrStageCellsHtml(counts, stages) {
+  return stages.map(s => `<td class="col-num">${fNum(counts[s] || 0)}</td>`).join('');
+}
+
+function lrSummaryTailCells(total, tok, enr) {
+  const tokConv = lrConvPct(tok, total);
+  const enrConv = lrConvPct(enr, total);
+  return `
+    <td class="col-num">${fNum(tok)}</td>
+    <td class="col-num">${fNum(enr)}</td>
+    <td class="col-pct">${rateBadge(parseFloat(tokConv))}</td>
+    <td class="col-pct">${rateBadge(parseFloat(enrConv))}</td>
+  `;
+}
+
 // Program with the highest lead count for this TL (within current filters)
 function lrDominantProgram(rows) {
   const progMap = {};
@@ -1853,67 +2419,53 @@ function renderLeads() {
     return;
   }
 
-  // Dynamically update the thead headers to guarantee they match the columns, solving caching issues
+  const lData = getBaseLAData();
+  const uniqueStages = lrGetUniqueStages(lData);
+  const stageColCount = uniqueStages.length;
+  const programColW = lrTextColWidth();
+  const tlColW = lrTextColWidth();
+
+  // Dynamically update the thead headers to match all unique Final Stage values
   const gmTable = document.getElementById('lead-gm-table')?.closest('table');
   if (gmTable) {
+    lrApplyColgroup(gmTable, uniqueStages, false);
     const thead = gmTable.querySelector('thead');
     if (thead) {
-      thead.innerHTML = `
-        <tr>
-          <th>GM Name</th>
-          <th>Total Leads</th>
-          <th>Interested</th>
-          <th>Follow Up</th>
-          <th>Token</th>
-          <th>Enrolled</th>
-          <th>Token Conversion %</th>
-          <th>Enrollment Conversion %</th>
-        </tr>
-      `;
+      thead.innerHTML = lrBuildSummaryThead(
+        [{ label: 'GM Name' }, { label: 'Total Leads' }],
+        uniqueStages,
+        2
+      );
     }
   }
 
   const tlTable = document.getElementById('lead-tl-table')?.closest('table');
   if (tlTable) {
+    lrApplyColgroup(tlTable, uniqueStages, true, programColW);
     const thead = tlTable.querySelector('thead');
     if (thead) {
-      thead.innerHTML = `
-        <tr>
-          <th>TL Name</th>
-          <th>Program</th>
-          <th>Total Leads</th>
-          <th>Interested</th>
-          <th>Follow Up</th>
-          <th>Token</th>
-          <th>Enrolled</th>
-          <th>Token Conversion %</th>
-          <th>Enrollment Conversion %</th>
-        </tr>
-      `;
+      thead.innerHTML = lrBuildSummaryThead(
+        [{ label: 'TL Name' }, { label: 'Total Leads' }],
+        uniqueStages,
+        2,
+        'Program'
+      );
     }
   }
 
   const bdeTable = document.getElementById('lead-bde-table')?.closest('table');
   if (bdeTable) {
+    lrApplyColgroup(bdeTable, uniqueStages, true, tlColW);
     const thead = bdeTable.querySelector('thead');
     if (thead) {
-      thead.innerHTML = `
-        <tr>
-          <th>BDE Name</th>
-          <th>TL</th>
-          <th>Total Leads</th>
-          <th>Interested</th>
-          <th>Follow Up</th>
-          <th>Token</th>
-          <th>Enrolled</th>
-          <th>Token Conversion %</th>
-          <th>Enrollment Conversion %</th>
-        </tr>
-      `;
+      thead.innerHTML = lrBuildSummaryThead(
+        [{ label: 'BDE Name' }, { label: 'Total Leads' }],
+        uniqueStages,
+        2,
+        'TL'
+      );
     }
   }
-
-  const lData = getBaseLAData();
 
   const total      = lData.length;
   const interested = lrCountInterested(lData);
@@ -2033,27 +2585,20 @@ function renderLeads() {
     const gmLeads = lData.filter(r => r.gm === gmName);
     if (gmLeads.length === 0) return;
     const gmTotal = gmLeads.length;
-    const gmInt   = lrCountInterested(gmLeads);
-    const gmFU    = lrCountFollowUp(gmLeads);
+    const gmStages = lrCountStages(gmLeads);
     const gmTok   = lrCountTokens(gmLeads);
     const gmEnr   = lrCountEnrolled(gmLeads);
-    const gmTokConv = lrConvPct(gmTok, gmTotal);
-    const gmEnrConv = lrConvPct(gmEnr, gmTotal);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="bold">${gmName}</td>
-      <td class="mono">${fNum(gmTotal)}</td>
-      <td class="mono">${fNum(gmInt)}</td>
-      <td class="mono">${fNum(gmFU)}</td>
-      <td class="mono">${fNum(gmTok)}</td>
-      <td class="mono">${fNum(gmEnr)}</td>
-      <td>${rateBadge(parseFloat(gmTokConv))}</td>
-      <td>${rateBadge(parseFloat(gmEnrConv))}</td>
+      ${lrStickyTd(gmName, 0, 2, 'col-name bold')}
+      ${lrStickyTd(fNum(gmTotal), 1, 2, 'col-num')}
+      ${lrStageCellsHtml(gmStages, uniqueStages)}
+      ${lrSummaryTailCells(gmTotal, gmTok, gmEnr)}
     `;
     gmTbody.appendChild(tr);
   });
-  if (gmTbody.innerHTML === '') emptyRow(gmTbody, 8);
+  if (gmTbody.innerHTML === '') emptyRow(gmTbody, 2 + stageColCount + 4);
 
   // TL-wise table ← TL Name + Program
   const tlTbody = document.getElementById('lead-tl-table');
@@ -2071,28 +2616,21 @@ function renderLeads() {
     const tlLeads = tlMap[tlName];
     const program = lrDominantProgram(tlLeads);
     const tlTotal = tlLeads.length;
-    const tlInt   = lrCountInterested(tlLeads);
-    const tlFU    = lrCountFollowUp(tlLeads);
+    const tlStages = lrCountStages(tlLeads);
     const tlTok   = lrCountTokens(tlLeads);
     const tlEnr   = lrCountEnrolled(tlLeads);
-    const tlTokConv = lrConvPct(tlTok, tlTotal);
-    const tlEnrConv = lrConvPct(tlEnr, tlTotal);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="bold">${tlName}</td>
-      <td>${program || '—'}</td>
-      <td class="mono">${fNum(tlTotal)}</td>
-      <td class="mono">${fNum(tlInt)}</td>
-      <td class="mono">${fNum(tlFU)}</td>
-      <td class="mono">${fNum(tlTok)}</td>
-      <td class="mono">${fNum(tlEnr)}</td>
-      <td>${rateBadge(parseFloat(tlTokConv))}</td>
-      <td>${rateBadge(parseFloat(tlEnrConv))}</td>
+      ${lrStickyTd(tlName, 0, 2, 'col-name bold')}
+      ${lrStickyTd(fNum(tlTotal), 1, 2, 'col-num')}
+      <td class="col-text" title="${(program || '').replace(/"/g, '&quot;')}">${program || '—'}</td>
+      ${lrStageCellsHtml(tlStages, uniqueStages)}
+      ${lrSummaryTailCells(tlTotal, tlTok, tlEnr)}
     `;
     tlTbody.appendChild(tr);
   });
-  if (tlTbody.innerHTML === '') emptyRow(tlTbody, 9);
+  if (tlTbody.innerHTML === '') emptyRow(tlTbody, 3 + stageColCount + 4);
 
   // BDE-wise table ← Owner (User Email) + TL Name
   const tbody = document.getElementById('lead-bde-table');
@@ -2110,29 +2648,22 @@ function renderLeads() {
     .sort((a, b) => a.owner.localeCompare(b.owner))
     .forEach(({ owner, tl, rows: bdeLeads }) => {
       const bTotal = bdeLeads.length;
-      const bInt   = lrCountInterested(bdeLeads);
-      const bFU    = lrCountFollowUp(bdeLeads);
+      const bStages = lrCountStages(bdeLeads);
       const bTok   = lrCountTokens(bdeLeads);
       const bEnr   = lrCountEnrolled(bdeLeads);
-      const bTokConv = lrConvPct(bTok, bTotal);
-      const bEnrConv = lrConvPct(bEnr, bTotal);
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td class="bold">${owner}</td>
-        <td>${tl || '—'}</td>
-        <td class="mono">${fNum(bTotal)}</td>
-        <td class="mono">${fNum(bInt)}</td>
-        <td class="mono">${fNum(bFU)}</td>
-        <td class="mono">${fNum(bTok)}</td>
-        <td class="mono">${fNum(bEnr)}</td>
-        <td>${rateBadge(parseFloat(bTokConv))}</td>
-        <td>${rateBadge(parseFloat(bEnrConv))}</td>
+        ${lrStickyTd(owner, 0, 2, 'col-name bold')}
+        ${lrStickyTd(fNum(bTotal), 1, 2, 'col-num')}
+        <td class="col-text" title="${(tl || '').replace(/"/g, '&quot;')}">${tl || '—'}</td>
+        ${lrStageCellsHtml(bStages, uniqueStages)}
+        ${lrSummaryTailCells(bTotal, bTok, bEnr)}
       `;
       tbody.appendChild(tr);
     });
 
-  if (tbody.innerHTML === '') emptyRow(tbody, 9);
+  if (tbody.innerHTML === '') emptyRow(tbody, 3 + stageColCount + 4);
 }
 
 // ==========================================
@@ -2140,41 +2671,56 @@ function renderLeads() {
 // ==========================================
 
 // --- CSV parsing helpers ---
-function parseCSVLine(line) {
-  const result = [];
-  let current = '';
+function parseCSV(text) {
+  const matrix = [];
+  let row = [];
+  let field = '';
   let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') {
-      inQuotes = !inQuotes;
-    } else if (ch === ',' && !inQuotes) {
-      result.push(current);
-      current = '';
+  const input = String(text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    const n = input[i + 1];
+
+    if (inQuotes) {
+      if (c === '"' && n === '"') {
+        field += '"';
+        i++;
+      } else if (c === '"') {
+        inQuotes = false;
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      row.push(field);
+      field = '';
+    } else if (c === '\n') {
+      row.push(field);
+      field = '';
+      if (row.some((cell) => cell.trim() !== '')) matrix.push(row);
+      row = [];
     } else {
-      current += ch;
+      field += c;
     }
   }
-  result.push(current);
-  return result;
-}
 
-function parseCSV(text) {
-  const lines = text.replace(/\r/g, '').split('\n');
-  if (lines.length < 2) return [];
-  const headers = parseCSVLine(lines[0]);
-  const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const vals = parseCSVLine(line);
+  if (field.length || row.length) {
+    row.push(field);
+    if (row.some((cell) => cell.trim() !== '')) matrix.push(row);
+  }
+
+  if (matrix.length < 2) return [];
+
+  const headers = matrix[0].map((h) => h.trim());
+  return matrix.slice(1).map((vals) => {
     const obj = {};
     headers.forEach((h, idx) => {
-      obj[h.trim()] = (vals[idx] !== undefined ? vals[idx] : '').trim();
+      obj[h] = (vals[idx] !== undefined ? vals[idx] : '').trim();
     });
-    rows.push(obj);
-  }
-  return rows;
+    return obj;
+  });
 }
 
 function mapCSVRow(obj) {
@@ -2814,14 +3360,9 @@ function emptyRow(tbody, cols) {
 // INIT
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
-  // Show login, hide dashboard
-  document.getElementById('app-layout').style.display = 'none';
-  const overlay = document.getElementById('login-overlay');
-  if (overlay) {
-    overlay.style.display = 'flex';
-  }
-  const usernameInput = document.getElementById('login-username');
-  if (usernameInput) {
-    usernameInput.focus();
+  if (!restoreSession()) {
+    showLoginScreen();
+    const usernameInput = document.getElementById('login-username');
+    if (usernameInput) usernameInput.focus();
   }
 });
