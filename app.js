@@ -111,6 +111,7 @@ function getAllowedGMs() {
   const userConfig = GM_USERS[currentUser.toLowerCase()];
   if (!userConfig) return [];
   if (userConfig.access === 'ALL') {
+    if (allowedGMsCache) return allowedGMsCache;
     const gms = new Set();
     if (prodLoaded) prodAllRows.forEach(r => { if (r.gm) gms.add(r.gm); });
     if (laLoaded) laAllRows.forEach(r => { if (r.gm) gms.add(r.gm); });
@@ -121,7 +122,8 @@ function getAllowedGMs() {
     if (gms.size === 0) {
       return ['Anshul', 'Umang', 'Anshuman', 'Rekha', 'Kavish', 'Siddhartha', 'Sowmya', 'Shringarika', 'Ajay'];
     }
-    return [...gms].sort();
+    allowedGMsCache = [...gms].sort();
+    return allowedGMsCache;
   }
   return userConfig.access;
 }
@@ -149,6 +151,7 @@ let activeFilters = {
 };
 
 let charts = {};   // chart.js instances
+let allowedGMsCache = null;
 
 // ==========================================
 // LEAD ANALYSIS — CSV STATE
@@ -551,6 +554,7 @@ function handleLogout() {
 // DASHBOARD INIT (after login)
 // ==========================================
 function initDashboard() {
+  allowedGMsCache = null;
   const allowed = getAllowedGMs();
   const userDisplayName = GM_USERS[currentUser]?.displayName || 'GM';
 
@@ -1184,6 +1188,7 @@ async function fetchRevenueCSV() {
     revTokenRows = tokenRaw.map(mapTokenRow).filter(r => r.tokenDate);
     revFullRows  = fullRaw.map(mapFullPayRow).filter(r => r.fullPayDate || r.amountPaid > 0);
     revLoaded = true;
+    allowedGMsCache = null;
 
     if (activeView === 'revenue' || activeView === 'overview') {
       const dates = revTokenRows.map(r => r.tokenDate).filter(Boolean).sort();
@@ -1585,6 +1590,7 @@ async function fetchProductivityCSV() {
     const raw = parseCSV(text);
     prodAllRows = raw.map(mapProdRow).filter(r => r.owner && r.date);
     prodLoaded = true;
+    allowedGMsCache = null;
 
     if (activeView === 'productivity') {
       const dates = prodAllRows.map(r => r.date).filter(Boolean).sort();
@@ -2206,6 +2212,7 @@ async function fetchLeadCSV() {
     const raw = parseCSV(text);
     laAllRows = raw.map(mapCSVRow).filter(r => r.email || r.createdOn);
     laLoaded  = true;
+    allowedGMsCache = null;
 
     if (CSV_LEAD_VIEWS.includes(activeView)) {
       const dates = laAllRows.map(r => r.createdOn).filter(Boolean).sort();
