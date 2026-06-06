@@ -916,82 +916,44 @@ const CHART_DEFAULTS = {
 // OVERVIEW VIEW — Revenue + Leads + Productivity CSVs
 // ==========================================
 function renderOverview() {
-  if (!revLoaded) {
-    fetchRevenueCSV();
-    return;
-  }
+  if (!revLoaded && !revLoading) fetchRevenueCSV();
   if (!laLoaded && !laLoading) fetchLeadCSV();
   if (!prodLoaded && !prodLoading) fetchProductivityCSV();
 
-  const tokenData = getBaseRevTokens();
-  const fullData  = getBaseRevFullPayments();
+  // 1. Total Token & 2. Current Token
+  // 3. Total Enrollment & 4. Current Enrollment
+  if (revLoaded) {
+    const currentTokens = revTokenRows.filter(r => revMatchesFilters(r, 'tokenDate'));
+    const currentEnrollments = revFullRows.filter(r => revMatchesFilters(r, 'fullPayDate'));
 
-  const tokenAgg   = revAggTokens(tokenData);
-  const fullAgg    = revAggFull(fullData);
-  const tokenRev   = tokenAgg.amount;
-  const fullRev    = fullAgg.amount;
-  const tokenCount = tokenAgg.count;
-  const fullCount  = fullAgg.count;
-  const totalRev   = tokenRev + fullRev;
+    const totalTokens = revTokenRows.filter(r => {
+      const inGM      = activeFilters.gm      === 'ALL' ? isGMAllowed(r.gm) : r.gm      === activeFilters.gm;
+      const inProgram = activeFilters.program === 'ALL' || r.type    === activeFilters.program;
+      const inTL      = activeFilters.tl      === 'ALL' || r.tl      === activeFilters.tl;
+      const inBDE     = activeFilters.bde     === 'ALL' || r.bdMail  === activeFilters.bde;
+      return inGM && inProgram && inTL && inBDE;
+    });
 
-  setText('ov-enrollments', fNum(fullCount));
-  setText('ov-enrollments-sub', `${tokenCount} token booking${tokenCount !== 1 ? 's' : ''}`);
-  setText('ov-tokens', fNum(tokenCount));
-  setText('ov-revenue', fCurrency(totalRev));
-  setText('ov-target-pct', '—');
-  setText('ov-target-sub', 'No target in sheet');
+    const totalEnrollments = revFullRows.filter(r => {
+      const inGM      = activeFilters.gm      === 'ALL' ? isGMAllowed(r.gm) : r.gm      === activeFilters.gm;
+      const inProgram = activeFilters.program === 'ALL' || r.type    === activeFilters.program;
+      const inTL      = activeFilters.tl      === 'ALL' || r.tl      === activeFilters.tl;
+      const inBDE     = activeFilters.bde     === 'ALL' || r.bdMail  === activeFilters.bde;
+      return inGM && inProgram && inTL && inBDE;
+    });
 
-  // Target (Unit wise) — grouped by Type (Program) from revenue sheets
-  const targetUnitsContainer = document.getElementById('ov-target-units');
-  targetUnitsContainer.innerHTML = '';
-  const typeSet = new Set([
-    ...tokenData.map(r => r.type).filter(Boolean),
-    ...fullData.map(r => r.type).filter(Boolean)
-  ]);
-  const types = [...typeSet].sort();
-
-  types.forEach((type, idx) => {
-    const tRows = tokenData.filter(r => r.type === type);
-    const fRows = fullData.filter(r => r.type === type);
-    const achieved = revAggTokens(tRows).amount + revAggFull(fRows).amount;
-    const accentClass = idx % 3 === 0 ? 'accent-indigo' : idx % 3 === 1 ? 'accent-emerald' : 'accent-purple';
-    const card = document.createElement('div');
-    card.className = `target-card ${accentClass}`;
-    card.innerHTML = `
-      <div class="target-card-header">
-        <span class="target-card-title">${type}</span>
-        <span class="target-card-sub">Token: ${fCurrency(revAggTokens(tRows).amount)} · Full: ${fCurrency(revAggFull(fRows).amount)}</span>
-      </div>
-      <div class="target-progress-wrap">
-        <div class="target-progress-stats">
-          <span>Total: ${fCurrency(achieved)}</span>
-          <span>${fNum(tRows.length + fRows.length)} bookings</span>
-        </div>
-      </div>
-    `;
-    targetUnitsContainer.appendChild(card);
-  });
-  if (types.length === 0) {
-    targetUnitsContainer.innerHTML = '<div class="empty-row" style="grid-column: 1/-1;">No revenue data for selected filters</div>';
-  }
-
-  // Lead Metrics — from leads CSV
-  if (laLoaded) {
-    const leadData = getBaseLAData();
-    const totalLeads    = leadData.length;
-    const leadTokens    = leadData.filter(r => isNonBlank(r.tokenDate)).length;
-    const totalEnrolled = leadData.filter(r => isNonBlank(r.enrollmentDate)).length;
-    const cvr           = totalLeads ? ((totalEnrolled / totalLeads) * 100).toFixed(2) : '0.00';
-    setText('ov-lead-total', fNum(totalLeads));
-    setText('ov-lead-tokens', fNum(leadTokens));
-    setText('ov-lead-cvr', `${cvr}%`);
+    setText('ov-total-tokens', fNum(totalTokens.length));
+    setText('ov-current-tokens', fNum(currentTokens.length));
+    setText('ov-total-enrollments', fNum(totalEnrollments.length));
+    setText('ov-current-enrollments', fNum(currentEnrollments.length));
   } else {
-    setText('ov-lead-total', '…');
-    setText('ov-lead-tokens', '…');
-    setText('ov-lead-cvr', '…');
+    setText('ov-total-tokens', '…');
+    setText('ov-current-tokens', '…');
+    setText('ov-total-enrollments', '…');
+    setText('ov-current-enrollments', '…');
   }
 
-  // Input Metrics — from productivity CSV
+  // 5. Avg Dialled & 6. Avg CC & 7. Avg TT
   if (prodLoaded) {
     const cData = getOverviewProdData();
     const { calls, connects, talk, activeBdes } = prodAggregate(cData);
@@ -1002,159 +964,44 @@ function renderOverview() {
     const avgDialled    = (calls / denom).toFixed(1);
     const avgConnected  = (connects / denom).toFixed(1);
     const avgTalkSec    = connects ? Math.round((talk * 60) / connects) : 0;
-    setText('ov-input-dialled', avgDialled);
-    setText('ov-input-connected', avgConnected);
-    setText('ov-input-talktime', formatAvgTalk(avgTalkSec));
+
+    setText('ov-avg-dialled', avgDialled);
+    setText('ov-avg-connected', avgConnected);
+    setText('ov-avg-talktime', formatAvgTalk(avgTalkSec));
   } else {
-    setText('ov-input-dialled', '…');
-    setText('ov-input-connected', '…');
-    setText('ov-input-talktime', '…');
+    setText('ov-avg-dialled', '…');
+    setText('ov-avg-connected', '…');
+    setText('ov-avg-talktime', '…');
   }
 
-  // Top 3 BDAs by total revenue
-  const bdaPodiumContainer = document.getElementById('ov-podium-bdas');
-  bdaPodiumContainer.innerHTML = '';
-  const bdeMap = {};
-  tokenData.forEach(r => {
-    if (!r.bdMail) return;
-    if (!bdeMap[r.bdMail]) bdeMap[r.bdMail] = { tokens: [], full: [], type: r.type };
-    bdeMap[r.bdMail].tokens.push(r);
-    if (r.type) bdeMap[r.bdMail].type = r.type;
-  });
-  fullData.forEach(r => {
-    if (!r.bdMail) return;
-    if (!bdeMap[r.bdMail]) bdeMap[r.bdMail] = { tokens: [], full: [], type: r.type };
-    bdeMap[r.bdMail].full.push(r);
-  });
+  // 8. Total Lead (CVR) & 9. Duration Total Lead (CVR)
+  if (laLoaded) {
+    const durationLeads = getBaseLAData();
+    const durationLeadsCount = durationLeads.length;
+    const durationEnrolledCount = durationLeads.filter(r => isNonBlank(r.enrollmentDate)).length;
+    const durationCVR = durationLeadsCount ? ((durationEnrolledCount / durationLeadsCount) * 100).toFixed(2) : '0.00';
 
-  const bdaRankings = Object.keys(bdeMap).map(bd => {
-    const tAmt = revAggTokens(bdeMap[bd].tokens).amount;
-    const fAmt = revAggFull(bdeMap[bd].full).amount;
-    return { bd, revenue: tAmt + fAmt, type: bdeMap[bd].type || '—' };
-  }).sort((a, b) => b.revenue - a.revenue);
-
-  const topBDAs = bdaRankings.filter(b => b.revenue > 0).slice(0, 3);
-  if (topBDAs.length > 0) {
-    topBDAs.forEach((bda, index) => {
-      const card = document.createElement('div');
-      card.className = `podium-card rank-${index + 1}`;
-      card.innerHTML = `
-        <div class="podium-card-head">
-          <div class="podium-rank-badge">${index + 1}</div>
-          <div class="podium-bda-name" title="${bda.bd}">${emailToDisplayName(bda.bd)}</div>
-        </div>
-        <div class="podium-bda-program">${bda.type}</div>
-        <div class="podium-bda-rev">${fCurrency(bda.revenue)}</div>
-      `;
-      bdaPodiumContainer.appendChild(card);
+    const totalLeads = laAllRows.filter(r => {
+      const inGM      = activeFilters.gm      === 'ALL' ? isGMAllowed(r.gm) : r.gm      === activeFilters.gm;
+      const inProgram = activeFilters.program === 'ALL' || r.program === activeFilters.program;
+      const inTL      = activeFilters.tl      === 'ALL' || r.tl      === activeFilters.tl;
+      const inBDE     = activeFilters.bde     === 'ALL' || r.owner   === activeFilters.bde;
+      return inGM && inProgram && inTL && inBDE;
     });
+    const totalLeadsCount = totalLeads.length;
+    const totalEnrolledCount = totalLeads.filter(r => isNonBlank(r.enrollmentDate)).length;
+    const totalCVR = totalLeadsCount ? ((totalEnrolledCount / totalLeadsCount) * 100).toFixed(2) : '0.00';
+
+    setText('ov-total-leads', fNum(totalLeadsCount));
+    setText('ov-total-leads-cvr', `${totalCVR}%`);
+    setText('ov-duration-leads', fNum(durationLeadsCount));
+    setText('ov-duration-leads-cvr', `${durationCVR}%`);
   } else {
-    bdaPodiumContainer.innerHTML = '<div class="empty-row" style="width: 100%">No revenue data for BDAs in this period</div>';
+    setText('ov-total-leads', '…');
+    setText('ov-total-leads-cvr', '…');
+    setText('ov-duration-leads', '…');
+    setText('ov-duration-leads-cvr', '…');
   }
-
-  // GM Performance
-  const gmTbody = document.getElementById('ov-gm-table');
-  gmTbody.innerHTML = '';
-  const gmNames = activeFilters.gm === 'ALL'
-    ? [...new Set([...tokenData, ...fullData].map(r => r.gm).filter(Boolean))].sort()
-    : [activeFilters.gm];
-
-  gmNames.forEach(gmName => {
-    const gmTokens = revAggTokens(tokenData.filter(r => r.gm === gmName));
-    const gmFull   = revAggFull(fullData.filter(r => r.gm === gmName));
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="bold">${gmName}</td>
-      <td class="mono">—</td>
-      <td class="mono">${fCurrency(gmTokens.amount)}</td>
-      <td class="mono">${fCurrency(gmFull.amount)}</td>
-    `;
-    gmTbody.appendChild(tr);
-  });
-  if (gmTbody.innerHTML === '') emptyRow(gmTbody, 4);
-
-  // TL Performance
-  const tlTbody = document.getElementById('ov-tl-perf-table');
-  tlTbody.innerHTML = '';
-  const tlNames = [...new Set([...tokenData, ...fullData].map(r => r.tl).filter(Boolean))].sort();
-  tlNames.forEach(tlName => {
-    const tlTokens = revAggTokens(tokenData.filter(r => r.tl === tlName));
-    const tlFull   = revAggFull(fullData.filter(r => r.tl === tlName));
-    if (tlTokens.count === 0 && tlFull.count === 0) return;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="bold">${tlName}</td>
-      <td class="mono">—</td>
-      <td class="mono">${fCurrency(tlTokens.amount)}</td>
-      <td class="mono">${fCurrency(tlFull.amount)}</td>
-    `;
-    tlTbody.appendChild(tr);
-  });
-  if (tlTbody.innerHTML === '') emptyRow(tlTbody, 4);
-
-  // BDA Performance
-  const bdaTbody = document.getElementById('ov-bda-table');
-  bdaTbody.innerHTML = '';
-  Object.keys(bdeMap).sort().forEach(bd => {
-    const tAmt = revAggTokens(bdeMap[bd].tokens);
-    const fAmt = revAggFull(bdeMap[bd].full);
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="bold">${bd}</td>
-      <td class="mono">—</td>
-      <td class="mono">${fCurrency(tAmt.amount)}</td>
-      <td class="mono">${fCurrency(fAmt.amount)}</td>
-    `;
-    bdaTbody.appendChild(tr);
-  });
-  if (bdaTbody.innerHTML === '') emptyRow(bdaTbody, 4);
-
-  // Date-wise Token & Enrollment
-  const dateTbody = document.getElementById('ov-date-table');
-  dateTbody.innerHTML = '';
-  const dateMap = {};
-  let d = new Date(activeFilters.dateFrom);
-  const end = new Date(activeFilters.dateTo);
-  while (d <= end) {
-    dateMap[d.toISOString().split('T')[0]] = { tokens: 0, tokenAmt: 0, enrolls: 0, enrollAmt: 0 };
-    d.setDate(d.getDate() + 1);
-  }
-
-  tokenData.forEach(r => {
-    if (dateMap[r.tokenDate]) {
-      dateMap[r.tokenDate].tokens++;
-      dateMap[r.tokenDate].tokenAmt += TOKEN_REVENUE_RATE;
-    }
-  });
-  fullData.forEach(r => {
-    if (dateMap[r.fullPayDate]) {
-      dateMap[r.fullPayDate].enrolls++;
-      dateMap[r.fullPayDate].enrollAmt += r.amountPaid;
-    }
-  });
-
-  const sortedDates = Object.keys(dateMap).sort((a, b) => b.localeCompare(a));
-  let hasDateData = false;
-  sortedDates.forEach(dateStr => {
-    const info = dateMap[dateStr];
-    if (info.tokens > 0 || info.enrolls > 0) {
-      hasDateData = true;
-      const dateObj = new Date(dateStr);
-      const formattedDate = dateObj.toLocaleDateString('en-GB', {
-        day: '2-digit', month: 'short', year: 'numeric'
-      });
-      const tokenDisplay  = info.tokens > 0 ? `${info.tokens} (${fCurrency(info.tokenAmt)})` : '0';
-      const enrollDisplay = info.enrolls > 0 ? `${info.enrolls} (${fCurrency(info.enrollAmt)})` : '0';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="bold">${formattedDate}</td>
-        <td class="mono">${tokenDisplay}</td>
-        <td class="mono">${enrollDisplay}</td>
-      `;
-      dateTbody.appendChild(tr);
-    }
-  });
-  if (!hasDateData) emptyRow(dateTbody, 3);
 }
 
 // ==========================================
@@ -1967,6 +1814,9 @@ function lrCountFollowUp(rows) {
 function lrCountEnrolled(rows) {
   return rows.filter(r => isNonBlank(r.enrollmentDate)).length;
 }
+function lrCountTokens(rows) {
+  return rows.filter(r => isNonBlank(r.tokenDate)).length;
+}
 function lrCountNotConnected(rows) {
   return rows.filter(r => (r.finalStage || '') === 'Not_Connected').length;
 }
@@ -1995,6 +1845,66 @@ function renderLeads() {
   if (!laLoaded) {
     fetchLeadCSV();
     return;
+  }
+
+  // Dynamically update the thead headers to guarantee they match the columns, solving caching issues
+  const gmTable = document.getElementById('lead-gm-table')?.closest('table');
+  if (gmTable) {
+    const thead = gmTable.querySelector('thead');
+    if (thead) {
+      thead.innerHTML = `
+        <tr>
+          <th>GM Name</th>
+          <th>Total Leads</th>
+          <th>Interested</th>
+          <th>Follow Up</th>
+          <th>Token</th>
+          <th>Enrolled</th>
+          <th>Token Conversion %</th>
+          <th>Enrollment Conversion %</th>
+        </tr>
+      `;
+    }
+  }
+
+  const tlTable = document.getElementById('lead-tl-table')?.closest('table');
+  if (tlTable) {
+    const thead = tlTable.querySelector('thead');
+    if (thead) {
+      thead.innerHTML = `
+        <tr>
+          <th>TL Name</th>
+          <th>Program</th>
+          <th>Total Leads</th>
+          <th>Interested</th>
+          <th>Follow Up</th>
+          <th>Token</th>
+          <th>Enrolled</th>
+          <th>Token Conversion %</th>
+          <th>Enrollment Conversion %</th>
+        </tr>
+      `;
+    }
+  }
+
+  const bdeTable = document.getElementById('lead-bde-table')?.closest('table');
+  if (bdeTable) {
+    const thead = bdeTable.querySelector('thead');
+    if (thead) {
+      thead.innerHTML = `
+        <tr>
+          <th>BDE Name</th>
+          <th>TL</th>
+          <th>Total Leads</th>
+          <th>Interested</th>
+          <th>Follow Up</th>
+          <th>Token</th>
+          <th>Enrolled</th>
+          <th>Token Conversion %</th>
+          <th>Enrollment Conversion %</th>
+        </tr>
+      `;
+    }
   }
 
   const lData = getBaseLAData();
@@ -2119,8 +2029,10 @@ function renderLeads() {
     const gmTotal = gmLeads.length;
     const gmInt   = lrCountInterested(gmLeads);
     const gmFU    = lrCountFollowUp(gmLeads);
+    const gmTok   = lrCountTokens(gmLeads);
     const gmEnr   = lrCountEnrolled(gmLeads);
-    const gmConv  = lrConvPct(gmEnr, gmTotal);
+    const gmTokConv = lrConvPct(gmTok, gmTotal);
+    const gmEnrConv = lrConvPct(gmEnr, gmTotal);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2128,12 +2040,14 @@ function renderLeads() {
       <td class="mono">${fNum(gmTotal)}</td>
       <td class="mono">${fNum(gmInt)}</td>
       <td class="mono">${fNum(gmFU)}</td>
+      <td class="mono">${fNum(gmTok)}</td>
       <td class="mono">${fNum(gmEnr)}</td>
-      <td>${rateBadge(parseFloat(gmConv))}</td>
+      <td>${rateBadge(parseFloat(gmTokConv))}</td>
+      <td>${rateBadge(parseFloat(gmEnrConv))}</td>
     `;
     gmTbody.appendChild(tr);
   });
-  if (gmTbody.innerHTML === '') emptyRow(gmTbody, 6);
+  if (gmTbody.innerHTML === '') emptyRow(gmTbody, 8);
 
   // TL-wise table ← TL Name + Program
   const tlTbody = document.getElementById('lead-tl-table');
@@ -2153,8 +2067,10 @@ function renderLeads() {
     const tlTotal = tlLeads.length;
     const tlInt   = lrCountInterested(tlLeads);
     const tlFU    = lrCountFollowUp(tlLeads);
+    const tlTok   = lrCountTokens(tlLeads);
     const tlEnr   = lrCountEnrolled(tlLeads);
-    const tlConv  = lrConvPct(tlEnr, tlTotal);
+    const tlTokConv = lrConvPct(tlTok, tlTotal);
+    const tlEnrConv = lrConvPct(tlEnr, tlTotal);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2163,12 +2079,14 @@ function renderLeads() {
       <td class="mono">${fNum(tlTotal)}</td>
       <td class="mono">${fNum(tlInt)}</td>
       <td class="mono">${fNum(tlFU)}</td>
+      <td class="mono">${fNum(tlTok)}</td>
       <td class="mono">${fNum(tlEnr)}</td>
-      <td>${rateBadge(parseFloat(tlConv))}</td>
+      <td>${rateBadge(parseFloat(tlTokConv))}</td>
+      <td>${rateBadge(parseFloat(tlEnrConv))}</td>
     `;
     tlTbody.appendChild(tr);
   });
-  if (tlTbody.innerHTML === '') emptyRow(tlTbody, 7);
+  if (tlTbody.innerHTML === '') emptyRow(tlTbody, 9);
 
   // BDE-wise table ← Owner (User Email) + TL Name
   const tbody = document.getElementById('lead-bde-table');
@@ -2188,8 +2106,10 @@ function renderLeads() {
       const bTotal = bdeLeads.length;
       const bInt   = lrCountInterested(bdeLeads);
       const bFU    = lrCountFollowUp(bdeLeads);
+      const bTok   = lrCountTokens(bdeLeads);
       const bEnr   = lrCountEnrolled(bdeLeads);
-      const bConv  = lrConvPct(bEnr, bTotal);
+      const bTokConv = lrConvPct(bTok, bTotal);
+      const bEnrConv = lrConvPct(bEnr, bTotal);
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -2198,13 +2118,15 @@ function renderLeads() {
         <td class="mono">${fNum(bTotal)}</td>
         <td class="mono">${fNum(bInt)}</td>
         <td class="mono">${fNum(bFU)}</td>
+        <td class="mono">${fNum(bTok)}</td>
         <td class="mono">${fNum(bEnr)}</td>
-        <td>${rateBadge(parseFloat(bConv))}</td>
+        <td>${rateBadge(parseFloat(bTokConv))}</td>
+        <td>${rateBadge(parseFloat(bEnrConv))}</td>
       `;
       tbody.appendChild(tr);
     });
 
-  if (tbody.innerHTML === '') emptyRow(tbody, 7);
+  if (tbody.innerHTML === '') emptyRow(tbody, 9);
 }
 
 // ==========================================
@@ -2431,6 +2353,58 @@ function renderLeadAnalysis() {
     return;
   }
 
+  // Dynamically update the thead headers to guarantee they match the columns, solving caching issues
+  const t1Table = document.getElementById('la-table1-body')?.closest('table');
+  if (t1Table) {
+    const thead = t1Table.querySelector('thead');
+    if (thead) {
+      thead.innerHTML = `
+        <tr>
+          <th>Date</th>
+          <th>Lead Count</th>
+          <th>Tokens</th>
+          <th>Enrolled</th>
+          <th>Token Conversion %</th>
+          <th>Enrollment Conversion %</th>
+        </tr>
+      `;
+    }
+  }
+
+  const t2Table = document.getElementById('la-table2-body')?.closest('table');
+  if (t2Table) {
+    const thead = t2Table.querySelector('thead');
+    if (thead) {
+      thead.innerHTML = `
+        <tr>
+          <th>Date</th>
+          <th>Lead Count</th>
+          <th>Tokens</th>
+          <th>Enrolled</th>
+          <th>Token Conversion %</th>
+          <th>Enrollment Conversion %</th>
+        </tr>
+      `;
+    }
+  }
+
+  const t3Table = document.getElementById('la-table3-body')?.closest('table');
+  if (t3Table) {
+    const thead = t3Table.querySelector('thead');
+    if (thead) {
+      thead.innerHTML = `
+        <tr>
+          <th>Date</th>
+          <th>Lead Count</th>
+          <th>Tokens</th>
+          <th>Enrolled</th>
+          <th>Token Conversion %</th>
+          <th>Enrollment Conversion %</th>
+        </tr>
+      `;
+    }
+  }
+
   const base = getBaseLAData();
 
   // T1 dropdowns: TL Name + Owner (User Email) from GM/Program/Date filtered pool
@@ -2601,19 +2575,21 @@ function renderTable1() {
     const row = map[date];
     if (row.leads === 0) return;
     hasData = true;
-    const cvr = ((row.enrolled / row.leads) * 100).toFixed(2);
+    const tokCvr = ((row.tokens / row.leads) * 100).toFixed(2);
+    const enrCvr = ((row.enrolled / row.leads) * 100).toFixed(2);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="mono">${date}</td>
       <td class="mono">${fNum(row.leads)}</td>
       <td class="mono">${fNum(row.tokens)}</td>
       <td class="mono">${fNum(row.enrolled)}</td>
-      <td class="mono">${cvr}%</td>
+      <td class="mono">${tokCvr}%</td>
+      <td class="mono">${enrCvr}%</td>
     `;
     tbody.appendChild(tr);
   });
 
-  if (!hasData) emptyRow(tbody, 5);
+  if (!hasData) emptyRow(tbody, 6);
 }
 
 function resetT1() {
@@ -2654,7 +2630,7 @@ function renderTable2() {
     (tlVal  === 'ALL' || r.tl        === tlVal)  &&
     (bdeVal === 'ALL' || r.owner     === bdeVal)
   );
-  renderLATable('la-table2-body', pool, 'subSource');
+  renderLATable('la-table2-body', pool, 'date');
 }
 
 function resetT2() {
@@ -2701,7 +2677,7 @@ function renderTable3() {
     (tlVal  === 'ALL' || r.tl       === tlVal)  &&
     (bdeVal === 'ALL' || r.owner    === bdeVal)
   );
-  renderLATable('la-table3-body', pool, 'campaign');
+  renderLATable('la-table3-body', pool, 'date');
 }
 
 function resetT3() {
@@ -2748,19 +2724,21 @@ function renderLATable(tbodyId, pool, groupBy) {
     const row = map[key];
     if (row.leads === 0) return;
     hasData = true;
-    const cvr = ((row.enrolled / row.leads) * 100).toFixed(2);
+    const tokCvr = ((row.tokens / row.leads) * 100).toFixed(2);
+    const enrCvr = ((row.enrolled / row.leads) * 100).toFixed(2);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="mono">${key}</td>
       <td class="mono">${fNum(row.leads)}</td>
       <td class="mono">${fNum(row.tokens)}</td>
       <td class="mono">${fNum(row.enrolled)}</td>
-      <td class="mono">${cvr}%</td>
+      <td class="mono">${tokCvr}%</td>
+      <td class="mono">${enrCvr}%</td>
     `;
     tbody.appendChild(tr);
   });
 
-  if (!hasData) emptyRow(tbody, 5);
+  if (!hasData) emptyRow(tbody, 6);
 }
 
 // ==========================================
