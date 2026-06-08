@@ -1100,118 +1100,253 @@ function mapFullPayRow(obj) {
 }
 
 function mapCohortRow(obj) {
+  const tls = ['TL1', 'TL2', 'TL3', 'TL4', 'TL5']
+    .map(k => (obj[k] || '').trim())
+    .filter(Boolean);
   return {
     programName:          (obj['Program Name'] || '').trim(),
     cohortName:           (obj['Cohort Name'] || '').trim(),
     startDate:            parseSheetDate(obj['Cohort Start Date']),
     endDate:              parseSheetDate(obj['Cohort End Date']),
     cohortTarget:         parseNum(obj['Cohort Target']),
+    gmTarget:             parseNum(obj['GM Target']),
+    gm:                   (obj['GM'] || '').trim(),
+    tls,
     targetPerMonthPerBDA: parseNum(obj['Target Per Month Per BDA']),
     targetPerDayPerBDA:   parseNum(obj['Target Per Day Per BDA']),
   };
 }
 
-// Returns total Cohort Target for a program (directly from sheet column)
+// Cohort sheet GM → TL list for a program (target mapping only)
+function getCohortTlsForGm(cohort, gmName) {
+  if (!cohort || !gmName || normTeamName(cohort.gm) !== normTeamName(gmName)) return [];
+  return cohort.tls || [];
+}
+
+function normTlMatch(a, b) {
+  const na = normTeamName(a);
+  const nb = normTeamName(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  // "Piyush" ↔ "Piyush Kumar", "Rekha" ↔ "Rekha Direct"
+  if (na.startsWith(nb + ' ') || nb.startsWith(na + ' ')) return true;
+  const stripDirect = (s) => s.replace(/\s+direct$/, '');
+  return stripDirect(na) === stripDirect(nb);
+}
+
+function cohortTlIsMapped(cohort, gmName, tlName) {
+  return getCohortTlsForGm(cohort, gmName).some(t => normTlMatch(t, tlName));
+}
+
+function cohortGmBaseTarget(cohort) {
+  return cohort.gmTarget || cohort.cohortTarget || 0;
+}
+
+function revGetFilterDateRange() {
+  return {
+    start: activeFilters.dateFrom || '',
+    end:   activeFilters.dateTo   || activeFilters.dateFrom || '',
+  };
+}
+
+function clampTargetDateStr(dateStr, minStr, maxStr) {
+  if (!dateStr) return minStr || '';
+  if (minStr && dateStr < minStr) return minStr;
+  if (maxStr && dateStr > maxStr) return maxStr;
+  return dateStr;
+}
+
+/**
+ * Prorated cohort target for the active date filter window.
+ * target = Cohort Target × (elapsed days in filter ∩ cohort ÷ total cohort days)
+ */
+function calculateProratedCohortTarget(cohort, filterStart, filterEnd) {
+  if (!cohort?.cohortTarget || !cohort.startDate || !cohort.endDate) {
+    return { target: 0, perDay: 0, elapsedDays: 0, totalDays: 0, fullTarget: 0 };
+  }
+
+  const cohortStart = cohort.startDate;
+  const cohortEnd   = cohort.endDate;
+  const totalDays   = cohortDayCount(cohortStart, cohortEnd);
+  const perDay      = cohort.cohortTarget / totalDays;
+  const fullTarget  = cohort.cohortTarget;
+
+  const fStart = filterStart || cohortStart;
+  const fEnd   = filterEnd   || cohortEnd;
+
+  if (fEnd < cohortStart || fStart > cohortEnd) {
+    return { target: 0, perDay, elapsedDays: 0, totalDays, fullTarget };
+  }
+
+  const effectiveStart = clampTargetDateStr(fStart, cohortStart, cohortEnd);
+  const effectiveEnd   = clampTargetDateStr(fEnd, cohortStart, cohortEnd);
+  const elapsedDays    = cohortDayCount(effectiveStart, effectiveEnd);
+  const target         = perDay * elapsedDays;
+
+  return {
+    target: Math.round(target * 10) / 10,
+    perDay: Math.round(perDay * 100) / 100,
+    elapsedDays,
+    totalDays,
+    fullTarget,
+  };
+}
+
+/** BDA target prorated by filter: (Target Per Month Per BDA / 30) × elapsed days */
+function calculateProratedBdaTarget(cohort, filterStart, filterEnd) {
+  if (!cohort?.targetPerMonthPerBDA || !cohort.startDate || !cohort.endDate) {
+    return { target: 0, perDay: 0 };
+  }
+
+  const perDay       = cohort.targetPerMonthPerBDA / 30;
+  const cohortStart  = cohort.startDate;
+  const cohortEnd    = cohort.endDate;
+  const fStart       = filterStart || cohortStart;
+  const fEnd         = filterEnd   || cohortEnd;
+
+  if (fEnd < cohortStart || fStart > cohortEnd) {
+    return { target: 0, perDay };
+  }
+
+  const effectiveStart = clampTargetDateStr(fStart, cohortStart, cohortEnd);
+  const effectiveEnd   = clampTargetDateStr(fEnd, cohortStart, cohortEnd);
+  const elapsedDays    = cohortDayCount(effectiveStart, effectiveEnd);
+
+  return {
+    target: Math.round(perDay * elapsedDays * 10) / 10,
+    perDay: Math.round(perDay * 100) / 100,
+  };
+}
+
+function revProratedCohortForProgram(program, cohortName) {
+  if (!cohortLoaded || !program) {
+    return { target: 0, perDay: 0, elapsedDays: 0, totalDays: 0, fullTarget: 0 };
+  }
+  const cohort = findCohortTarget(program, cohortName);
+  if (!cohort) {
+    return { target: 0, perDay: 0, elapsedDays: 0, totalDays: 0, fullTarget: 0 };
+  }
+  const { start, end } = revGetFilterDateRange();
+  return calculateProratedCohortTarget(cohort, start, end);
+}
+
+// Prorated target for selected program, or sum across all programs when ALL
 function revCohortTotalTarget(program) {
   if (!cohortLoaded) return 0;
   const prog = program ?? activeFilters.program;
-  if (!prog || prog === 'ALL') return 0;
-  const cohort = findCohortTarget(prog);
-  return cohort?.cohortTarget || 0;
+
+  if (!prog || prog === 'ALL') {
+    const programs = [...new Set(cohortTargetRows.map(r => r.programName).filter(Boolean))];
+    return programs.reduce((sum, p) => sum + revProratedCohortForProgram(p).target, 0);
+  }
+
+  return revProratedCohortForProgram(prog).target;
 }
 
-// Returns per-day target = Cohort Target / cohort days
 function revCohortPerDayTarget(program) {
   if (!cohortLoaded) return 0;
   const prog = program ?? activeFilters.program;
-  if (!prog || prog === 'ALL') return 0;
-  const cohort = findCohortTarget(prog);
-  if (!cohort?.cohortTarget) return 0;
-  const days = cohortDayCount(cohort.startDate, cohort.endDate);
-  return cohort.cohortTarget / days;
+
+  if (!prog || prog === 'ALL') {
+    const programs = [...new Set(cohortTargetRows.map(r => r.programName).filter(Boolean))];
+    return programs.reduce((sum, p) => sum + revProratedCohortForProgram(p).perDay, 0);
+  }
+
+  return revProratedCohortForProgram(prog).perDay;
 }
 
-// For a set of revenue rows (GM/TL slice), derive Cohort Target by summing
-// the Cohort Target of each unique program present in those rows.
-// Returns { total, perDay } both as floats.
-function revRowsCohortTarget(contextRows) {
-  if (!cohortLoaded || !contextRows?.length) return { total: 0, perDay: 0 };
-  const programs = [...new Set(contextRows.map(r => r.type).filter(Boolean))];
+function revProgramsInScope(contextRows) {
+  const fromRows = [...new Set((contextRows || []).map(r => r.type).filter(Boolean))];
+  if (fromRows.length) return fromRows;
+  if (activeFilters.program !== 'ALL') return [activeFilters.program];
+  return [...new Set(cohortTargetRows.map(r => r.programName).filter(Boolean))];
+}
+
+// Target scoped to active GM / TL / BDE filters (KPI + unit cards)
+function revScopedTarget(contextRows) {
+  if (!cohortLoaded) return { total: 0, perDay: 0 };
+
+  if (activeFilters.bde !== 'ALL') {
+    return revBdaRowsCohortTarget(contextRows);
+  }
+  if (activeFilters.tl !== 'ALL') {
+    return revTlRowsCohortTarget(activeFilters.tl);
+  }
+  if (activeFilters.gm !== 'ALL') {
+    return revRowsCohortTarget(contextRows, activeFilters.gm);
+  }
+
+  const programs = revProgramsInScope(contextRows);
   let total = 0, perDay = 0;
-  programs.forEach(prog => {
-    const cohort = findCohortTarget(prog);
-    if (!cohort?.cohortTarget) return;
-    total  += cohort.cohortTarget;
-    const days = cohortDayCount(cohort.startDate, cohort.endDate);
-    perDay += cohort.cohortTarget / days;
+  programs.forEach(p => {
+    const r = revProratedCohortForProgram(p);
+    total  += r.target;
+    perDay += r.perDay;
   });
   return { total, perDay };
 }
 
-// For a BDA row slice: Target Per Month Per BDA × (cohort days / 30)
-// Returns { total, perDay } both as floats.
+// GM slice: sum prorated GM Target per program where cohort sheet GM matches
+function revRowsCohortTarget(contextRows, gmName) {
+  if (!cohortLoaded) return { total: 0, perDay: 0 };
+  const { start, end } = revGetFilterDateRange();
+  const programs = revProgramsInScope(contextRows);
+  if (!programs.length) return { total: 0, perDay: 0 };
+  let total = 0, perDay = 0;
+  programs.forEach(prog => {
+    const cohort = findCohortTarget(prog);
+    if (!cohort) return;
+    if (gmName && normTeamName(cohort.gm) !== normTeamName(gmName)) return;
+    const baseTarget = cohortGmBaseTarget(cohort);
+    if (!baseTarget) return;
+    const result = calculateProratedCohortTarget({ ...cohort, cohortTarget: baseTarget }, start, end);
+    total  += result.target;
+    perDay += result.perDay;
+  });
+  return { total, perDay };
+}
+
+// BDA slice: prorated Target Per Month Per BDA per program
 function revBdaRowsCohortTarget(contextRows) {
-  if (!cohortLoaded || !contextRows?.length) return { total: 0, perDay: 0 };
-  const programs = [...new Set(contextRows.map(r => r.type).filter(Boolean))];
+  if (!cohortLoaded) return { total: 0, perDay: 0 };
+  const { start, end } = revGetFilterDateRange();
+  const programs = revProgramsInScope(contextRows);
+  if (!programs.length) return { total: 0, perDay: 0 };
   let total = 0, perDay = 0;
   programs.forEach(prog => {
     const cohort = findCohortTarget(prog);
-    if (!cohort?.targetPerMonthPerBDA) return;
-    const days = cohortDayCount(cohort.startDate, cohort.endDate);
-    total  += cohort.targetPerMonthPerBDA * (days / 30);
-    perDay += cohort.targetPerMonthPerBDA / 30;
+    if (!cohort) return;
+    const result = calculateProratedBdaTarget(cohort, start, end);
+    total  += result.target;
+    perDay += result.perDay;
   });
   return { total, perDay };
 }
 
-// Builds a GM → Set<normTlName> map from the input roster (used for TL proportional targets)
-function buildGmTlCountMap() {
-  const rosterMap = buildInputBdaRosterMap();
-  const gmTls = new Map(); // normGmName → Set of normTlNames
-  for (const entry of rosterMap.values()) {
-    if (!entry.gm || !entry.tl) continue;
-    const gKey = normTeamName(entry.gm);
-    if (!gmTls.has(gKey)) gmTls.set(gKey, new Set());
-    gmTls.get(gKey).add(normTeamName(entry.tl));
-  }
-  return gmTls;
-}
+// TL slice: GM Target ÷ TLs listed in cohort sheet (TL1–TL5) for that GM + program
+// Programs come from cohort sheet mapping (not revenue rows). Unmapped TL → 0.
+function revTlRowsCohortTarget(tlName) {
+  if (!cohortLoaded || !tlName) return { total: 0, perDay: 0 };
 
-// For a TL row slice: GM Cohort Target ÷ number of TLs under that GM (from input roster)
-// Falls back to revRowsCohortTarget if GM/TL count can't be determined.
-// Accepts a pre-built gmTlCountMap for efficiency (built once per render call).
-function revTlRowsCohortTarget(tlName, contextRows, gmTlCountMap) {
-  if (!cohortLoaded || !contextRows?.length) return { total: 0, perDay: 0 };
-
-  // Find GM for this TL — first from input roster, then from revenue rows
-  const rosterMap = buildInputBdaRosterMap();
-  let gmForTl = '';
-  for (const entry of rosterMap.values()) {
-    if (normTeamName(entry.tl) === normTeamName(tlName) && entry.gm) {
-      gmForTl = entry.gm;
-      break;
-    }
-  }
-  if (!gmForTl) {
-    const revRow = [...revTokenRows, ...revFullRows].find(
-      r => normTeamName(r.tl) === normTeamName(tlName) && r.gm
-    );
-    gmForTl = revRow?.gm || '';
-  }
-  if (!gmForTl) return revRowsCohortTarget(contextRows);
-
-  // Count TLs under this GM
-  const tlSet = gmTlCountMap?.get(normTeamName(gmForTl));
-  const tlCount = tlSet?.size || 1;
-
-  const programs = [...new Set(contextRows.map(r => r.type).filter(Boolean))];
+  const gmFilter   = activeFilters.gm !== 'ALL' ? activeFilters.gm : '';
+  const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+  const { start, end } = revGetFilterDateRange();
   let total = 0, perDay = 0;
-  programs.forEach(prog => {
-    const cohort = findCohortTarget(prog);
-    if (!cohort?.cohortTarget) return;
-    total  += cohort.cohortTarget / tlCount;
-    const days = cohortDayCount(cohort.startDate, cohort.endDate);
-    perDay += (cohort.cohortTarget / days) / tlCount;
+
+  cohortTargetRows.forEach(cohort => {
+    if (progFilter && cohort.programName !== progFilter) return;
+
+    const gmName = gmFilter || cohort.gm;
+    if (!gmName || normTeamName(cohort.gm) !== normTeamName(gmName)) return;
+    if (!cohortTlIsMapped(cohort, gmName, tlName)) return;
+
+    const tls = getCohortTlsForGm(cohort, gmName);
+    const baseTarget = cohortGmBaseTarget(cohort);
+    if (!tls.length || !baseTarget) return;
+
+    const result = calculateProratedCohortTarget({ ...cohort, cohortTarget: baseTarget }, start, end);
+    total  += result.target / tls.length;
+    perDay += result.perDay / tls.length;
   });
   return { total, perDay };
 }
@@ -1655,21 +1790,21 @@ function renderRevenue() {
 
   setText('rev-total', fCurrency(totalRev));
   setText('rev-total-sub', 'collected');
-  setText('rev-full',  fCurrency(fullRev));
-  setText('rev-full-sub', `${fullCount} full payment${fullCount !== 1 ? 's' : ''}`);
-  setText('rev-tokens', fCurrency(tokenRev));
-  setText('rev-tokens-sub', `${tokenCount} token booking${tokenCount !== 1 ? 's' : ''}`);
+  setText('rev-full',  fNum(fullCount));
+  setText('rev-full-sub', fCurrency(fullRev));
+  setText('rev-tokens', fNum(tokenCount));
+  setText('rev-tokens-sub', fCurrency(tokenRev));
 
-  const targetFull = revCohortTotalTarget();
+  const scopeRows = [...tokenData, ...fullData];
+  const { total: targetFull, perDay } = revScopedTarget(scopeRows);
   const achievedFull = fullAgg.count;
   if (cohortLoaded && targetFull > 0) {
     const targetPct = Math.min(999, (achievedFull / targetFull) * 100);
-    const perDay = revCohortPerDayTarget();
     setText('rev-target-pct', `${targetPct.toFixed(1)}%`);
     setText('rev-target-sub', `${fNum(achievedFull)} of ${formatTargetNum(targetFull)} full${perDay ? ` · ${formatTargetNum(perDay)}/day` : ''}`);
   } else {
     setText('rev-target-pct', '—');
-    setText('rev-target-sub', cohortLoaded ? 'Select a program for target' : 'Loading targets…');
+    setText('rev-target-sub', cohortLoaded ? 'No target for date range' : 'Loading targets…');
   }
 
   // Target (Unit wise) — grouped by Type (Program)
@@ -1680,6 +1815,9 @@ function renderRevenue() {
     ...fullData.map(r => r.type).filter(Boolean)
   ]);
   const types = [...typeSet].sort();
+  if (types.length === 0 && activeFilters.program !== 'ALL') {
+    types.push(activeFilters.program);
+  }
 
   types.forEach((type, idx) => {
     const tRows = tokenData.filter(r => r.type === type);
@@ -1688,10 +1826,7 @@ function renderRevenue() {
     const fAgg = revAggFull(fRows);
     const achieved = tAgg.amount + fAgg.amount;
     const cohort = findCohortTarget(type);
-    const progTarget  = cohort?.cohortTarget || 0;
-    const progPerDay  = progTarget && cohort
-      ? progTarget / cohortDayCount(cohort.startDate, cohort.endDate)
-      : 0;
+    const { total: progTarget, perDay: progPerDay } = revScopedTarget([...tRows, ...fRows]);
     const progPct = progTarget ? Math.min(100, (fAgg.count / progTarget) * 100) : 0;
     const cohortDates = cohort ? `${cohort.startDate} → ${cohort.endDate}` : '';
     const accentClass = idx % 3 === 0 ? 'accent-indigo' : idx % 3 === 1 ? 'accent-emerald' : 'accent-purple';
@@ -1784,7 +1919,7 @@ function renderRevenue() {
     const gmRows = [...tokenData, ...fullData].filter(r => r.gm === gmName);
     const gmTokens = revAggTokens(tokenData.filter(r => r.gm === gmName));
     const gmFull   = revAggFull(fullData.filter(r => r.gm === gmName));
-    const { total: gmTarget, perDay: gmTargetDay } = revRowsCohortTarget(gmRows);
+    const { total: gmTarget, perDay: gmTargetDay } = revRowsCohortTarget(gmRows, gmName);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-name bold">${gmName}</td>
@@ -1800,13 +1935,12 @@ function renderRevenue() {
   const tlTbody = document.getElementById('rev-tl-perf-table');
   tlTbody.innerHTML = '';
   const tlNames = [...new Set([...tokenData, ...fullData].map(r => r.tl).filter(Boolean))].sort();
-  const gmTlCountMap = (cohortLoaded && prodLoaded) ? buildGmTlCountMap() : null;
   tlNames.forEach(tlName => {
     const tlRows = [...tokenData, ...fullData].filter(r => normTeamName(r.tl) === normTeamName(tlName));
     const tlTokens = revAggTokens(tokenData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
     const tlFull   = revAggFull(fullData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
     if (tlTokens.count === 0 && tlFull.count === 0) return;
-    const { total: tlTarget, perDay: tlTargetDay } = revTlRowsCohortTarget(tlName, tlRows, gmTlCountMap);
+    const { total: tlTarget, perDay: tlTargetDay } = revTlRowsCohortTarget(tlName);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-name bold">${tlName}</td>
