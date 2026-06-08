@@ -152,6 +152,8 @@ let activeFilters = {
 
 let charts = {};   // chart.js instances
 let allowedGMsCache = null;
+let userSelectedDate = false;
+let lastAppliedDateOption = 'custom';
 
 // ==========================================
 // LEAD ANALYSIS — CSV STATE
@@ -633,8 +635,27 @@ function initDashboard() {
   populateBDEFilter('ALL');
 
   // Set dates
-  document.getElementById('date-from').value = activeFilters.dateFrom;
-  document.getElementById('date-to').value   = activeFilters.dateTo;
+  userSelectedDate = true;
+  lastAppliedDateOption = 'today';
+  
+  const today = new Date();
+  const toISODate = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const todayStr = toISODate(today);
+  
+  activeFilters.dateFrom = todayStr;
+  activeFilters.dateTo   = todayStr;
+  
+  document.getElementById('date-from').value = todayStr;
+  document.getElementById('date-to').value   = todayStr;
+  
+  const filterDateEl = document.getElementById('filter-date');
+  if (filterDateEl) filterDateEl.value = 'today';
+  updateDateDisplayLabel();
 
   // Preload CSVs for Overview + My Team
   if (!prodLoaded && !prodLoading) fetchProductivityCSV();
@@ -1361,6 +1382,7 @@ function formatTargetNum(n) {
 }
 
 function applyCohortDateRangeForFilters() {
+  if (userSelectedDate) return false;
   if (!cohortLoaded || !cohortTargetRows.length) return false;
 
   let startDate = '';
@@ -1387,6 +1409,12 @@ function applyCohortDateRangeForFilters() {
   const dateToEl   = document.getElementById('date-to');
   if (dateFromEl) dateFromEl.value = startDate;
   if (dateToEl)   dateToEl.value   = endDate;
+
+  const filterDateEl = document.getElementById('filter-date');
+  if (filterDateEl) filterDateEl.value = 'custom';
+  lastAppliedDateOption = 'custom';
+  updateDateDisplayLabel();
+
   return true;
 }
 
@@ -1576,15 +1604,22 @@ async function fetchRevenueCSV() {
     allowedGMsCache = null;
 
     if (activeView === 'revenue' || activeView === 'overview') {
-      if (!applyCohortDateRangeForFilters()) {
-        const dates = revTokenRows.map(r => r.tokenDate).filter(Boolean).sort();
-        if (dates.length) {
-          activeFilters.dateFrom = dates[0];
-          activeFilters.dateTo   = dates[dates.length - 1];
-          const dateFromEl = document.getElementById('date-from');
-          const dateToEl   = document.getElementById('date-to');
-          if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
-          if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+      if (!userSelectedDate) {
+        if (!applyCohortDateRangeForFilters()) {
+          const dates = revTokenRows.map(r => r.tokenDate).filter(Boolean).sort();
+          if (dates.length) {
+            activeFilters.dateFrom = dates[0];
+            activeFilters.dateTo   = dates[dates.length - 1];
+            const dateFromEl = document.getElementById('date-from');
+            const dateToEl   = document.getElementById('date-to');
+            if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
+            if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+
+            const filterDateEl = document.getElementById('filter-date');
+            if (filterDateEl) filterDateEl.value = 'custom';
+            lastAppliedDateOption = 'custom';
+            updateDateDisplayLabel();
+          }
         }
       }
       populateRevGlobalFilters();
@@ -2017,14 +2052,21 @@ async function fetchProductivityCSV() {
     allowedGMsCache = null;
 
     if (activeView === 'productivity') {
-      const dates = prodAllRows.map(r => r.date).filter(Boolean).sort();
-      if (dates.length) {
-        activeFilters.dateFrom = dates[0];
-        activeFilters.dateTo   = dates[dates.length - 1];
-        const dateFromEl = document.getElementById('date-from');
-        const dateToEl   = document.getElementById('date-to');
-        if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
-        if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+      if (!userSelectedDate) {
+        const dates = prodAllRows.map(r => r.date).filter(Boolean).sort();
+        if (dates.length) {
+          activeFilters.dateFrom = dates[0];
+          activeFilters.dateTo   = dates[dates.length - 1];
+          const dateFromEl = document.getElementById('date-from');
+          const dateToEl   = document.getElementById('date-to');
+          if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
+          if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+
+          const filterDateEl = document.getElementById('filter-date');
+          if (filterDateEl) filterDateEl.value = 'custom';
+          lastAppliedDateOption = 'custom';
+          updateDateDisplayLabel();
+        }
       }
       populateProdGlobalFilters();
       renderActiveView();
@@ -2761,14 +2803,21 @@ async function fetchLeadCSV() {
     allowedGMsCache = null;
 
     if (CSV_LEAD_VIEWS.includes(activeView)) {
-      const dates = laAllRows.map(r => r.createdOn).filter(Boolean).sort();
-      if (dates.length) {
-        activeFilters.dateFrom = dates[0];
-        activeFilters.dateTo   = dates[dates.length - 1];
-        const dateFromEl = document.getElementById('date-from');
-        const dateToEl   = document.getElementById('date-to');
-        if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
-        if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+      if (!userSelectedDate) {
+        const dates = laAllRows.map(r => r.createdOn).filter(Boolean).sort();
+        if (dates.length) {
+          activeFilters.dateFrom = dates[0];
+          activeFilters.dateTo   = dates[dates.length - 1];
+          const dateFromEl = document.getElementById('date-from');
+          const dateToEl   = document.getElementById('date-to');
+          if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
+          if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+
+          const filterDateEl = document.getElementById('filter-date');
+          if (filterDateEl) filterDateEl.value = 'custom';
+          lastAppliedDateOption = 'custom';
+          updateDateDisplayLabel();
+        }
       }
       populateLAGlobalFilters();
     }
@@ -3364,5 +3413,142 @@ window.addEventListener('DOMContentLoaded', () => {
     showLoginScreen();
     const usernameInput = document.getElementById('login-username');
     if (usernameInput) usernameInput.focus();
+  }
+});
+
+// ==========================================
+// DATE FILTER PRESET & POPUP HANDLERS
+// ==========================================
+function onDateOptionChange() {
+  const opt = document.getElementById('filter-date').value;
+  if (opt === 'custom') {
+    showCustomDatePopup();
+  } else {
+    applyDatePreset(opt);
+  }
+}
+
+function applyDatePreset(opt) {
+  const today = new Date();
+  let fromDate = '';
+  let toDate = '';
+
+  const toISODate = (date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  switch (opt) {
+    case 'today':
+      fromDate = toISODate(today);
+      toDate = toISODate(today);
+      break;
+    case 'yesterday':
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+      fromDate = toISODate(yesterday);
+      toDate = toISODate(yesterday);
+      break;
+    case 'last7days':
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(today.getDate() - 6);
+      fromDate = toISODate(sevenDaysAgo);
+      toDate = toISODate(today);
+      break;
+    case 'thismonth':
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      fromDate = toISODate(startOfMonth);
+      toDate = toISODate(endOfMonth);
+      break;
+    case 'lastmonth':
+      const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      fromDate = toISODate(startOfLastMonth);
+      toDate = toISODate(endOfLastMonth);
+      break;
+    case 'last3months':
+      const startOfThreeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+      const endOfCurrentMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      fromDate = toISODate(startOfThreeMonthsAgo);
+      toDate = toISODate(endOfCurrentMonth);
+      break;
+    default:
+      return;
+  }
+
+  const dateFromEl = document.getElementById('date-from');
+  const dateToEl = document.getElementById('date-to');
+  if (dateFromEl) dateFromEl.value = fromDate;
+  if (dateToEl) dateToEl.value = toDate;
+  activeFilters.dateFrom = fromDate;
+  activeFilters.dateTo = toDate;
+  userSelectedDate = true;
+  lastAppliedDateOption = opt;
+  updateDateDisplayLabel();
+  applyFilters();
+}
+
+function showCustomDatePopup() {
+  const popup = document.getElementById('custom-date-popup');
+  if (!popup) return;
+  
+  // Pre-populate with currently active filters
+  const dateFromEl = document.getElementById('date-from');
+  const dateToEl = document.getElementById('date-to');
+  if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
+  if (dateToEl) dateToEl.value = activeFilters.dateTo;
+  
+  popup.style.display = 'block';
+}
+
+function closeCustomDatePopup(apply) {
+  const popup = document.getElementById('custom-date-popup');
+  if (!popup) return;
+  
+  if (apply) {
+    const fromVal = document.getElementById('date-from').value;
+    const toVal = document.getElementById('date-to').value;
+    if (!fromVal || !toVal) {
+      alert('Please select both From and To dates.');
+      return;
+    }
+    activeFilters.dateFrom = fromVal;
+    activeFilters.dateTo = toVal;
+    userSelectedDate = true;
+    lastAppliedDateOption = 'custom';
+    updateDateDisplayLabel();
+    applyFilters();
+  } else {
+    const filterDateEl = document.getElementById('filter-date');
+    if (filterDateEl) filterDateEl.value = lastAppliedDateOption;
+  }
+  
+  popup.style.display = 'none';
+}
+
+function updateDateDisplayLabel() {
+  const label = document.getElementById('date-display-label');
+  if (!label) return;
+  
+  const from = activeFilters.dateFrom;
+  const to = activeFilters.dateTo;
+  if (from && to) {
+    label.textContent = `${from} to ${to}`;
+    label.style.display = 'inline-block';
+  } else {
+    label.textContent = '';
+    label.style.display = 'none';
+  }
+}
+
+// Click outside to dismiss popup
+document.addEventListener('click', (event) => {
+  const wrapper = document.querySelector('.date-select-wrapper');
+  const popup = document.getElementById('custom-date-popup');
+  if (popup && popup.style.display === 'block' && wrapper && !wrapper.contains(event.target)) {
+    closeCustomDatePopup(false);
   }
 });

@@ -820,8 +820,112 @@ html, body {
   box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
 }
 
-.date-group { gap: 6px; }
+.date-group { gap: 8px; display: flex; align-items: center; }
 .date-sep { font-size: 12px; color: var(--text-muted); }
+
+.date-select-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.custom-date-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  padding: 16px;
+  z-index: 1000;
+  width: 260px;
+}
+
+.custom-date-popup-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.popup-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.popup-field label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.popup-field input[type="date"] {
+  padding: 8px 10px;
+  border: 1.5px solid #c7d2fe;
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #4338ca;
+  background: #f5f3ff;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  font-weight: 500;
+}
+
+.popup-field input[type="date"]:focus {
+  border-color: #818cf8;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
+}
+
+.popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.popup-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.popup-btn.cancel {
+  background: #f1f5f9;
+  color: var(--text-secondary);
+}
+
+.popup-btn.cancel:hover {
+  background: #e2e8f0;
+}
+
+.popup-btn.apply {
+  background: #4338ca;
+  color: #ffffff;
+}
+
+.popup-btn.apply:hover {
+  background: #312e81;
+}
+
+.date-display-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: #f1f5f9;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ==========================================================================
    VIEWPORT / SECTIONS
