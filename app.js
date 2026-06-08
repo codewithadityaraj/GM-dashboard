@@ -161,7 +161,7 @@ let lastAppliedDateOption = 'custom';
 const SHEETS_API = {
   productivity: '/api/sheets?sheet=productivity',
   revenueToken: '/api/sheets?sheet=revenue-token',
-  revenueFull:  '/api/sheets?sheet=revenue-full',
+  revenueFull: '/api/sheets?sheet=revenue-full',
   cohortTargets: '/api/sheets?sheet=cohort-targets',
 };
 
@@ -192,19 +192,19 @@ async function loadSheetConfig() {
 function viewUsesLeadCSV() {
   return CSV_LEAD_VIEWS.includes(activeView) || activeView === 'overview';
 }
-let laAllRows  = [];   // parsed CSV rows
-let laLoaded   = false;
-let laLoading  = false;
+let laAllRows = [];   // parsed CSV rows
+let laLoaded = false;
+let laLoading = false;
 
 const CSV_LEAD_VIEWS = ['lead-analysis', 'leads'];
 const TOKEN_REVENUE_RATE = 5000;
-let prodAllRows  = [];
-let prodLoaded   = false;
-let prodLoading  = false;
+let prodAllRows = [];
+let prodLoaded = false;
+let prodLoading = false;
 let revTokenRows = [];
-let revFullRows  = [];
-let revLoaded    = false;
-let revLoading   = false;
+let revFullRows = [];
+let revLoaded = false;
+let revLoading = false;
 let cohortTargetRows = [];
 let cohortLoaded = false;
 
@@ -287,7 +287,7 @@ function buildTeamTreeFromCSV() {
     tree[gm][tl].add(owner);
   };
   if (prodLoaded) prodAllRows.forEach(r => add(r.gm, r.manager, r.owner));
-  if (laLoaded)   laAllRows.forEach(r => add(r.gm, r.tl, r.owner));
+  if (laLoaded) laAllRows.forEach(r => add(r.gm, r.tl, r.owner));
   return tree;
 }
 
@@ -364,10 +364,10 @@ function renderSidebarTeam() {
 
 // All possible managers & BDEs (combined for both GMs)
 const ALL_TLS = [
-  { name: 'Rahul',  program: 'Online MBA',              target: 12000000, bdes: ['Aditi', 'Vikram', 'Kunal'] },
-  { name: 'Priya',  program: 'Advanced AI/ML',          target: 8000000,  bdes: ['Riya', 'Arjun', 'Vivek'] },
-  { name: 'Amit',   program: 'M.Tech Data Science',     target: 10000000, bdes: ['Neha', 'Rohan'] },
-  { name: 'Sneha',  program: 'Executive Cybersecurity',  target: 6000000,  bdes: ['Sameer', 'Pooja'] }
+  { name: 'Rahul', program: 'Online MBA', target: 12000000, bdes: ['Aditi', 'Vikram', 'Kunal'] },
+  { name: 'Priya', program: 'Advanced AI/ML', target: 8000000, bdes: ['Riya', 'Arjun', 'Vivek'] },
+  { name: 'Amit', program: 'M.Tech Data Science', target: 10000000, bdes: ['Neha', 'Rohan'] },
+  { name: 'Sneha', program: 'Executive Cybersecurity', target: 6000000, bdes: ['Sameer', 'Pooja'] }
 ];
 
 function generateDatabase() {
@@ -376,7 +376,7 @@ function generateDatabase() {
   const payments = [];
 
   const startDate = new Date('2026-05-01');
-  const endDate   = new Date('2026-05-28');
+  const endDate = new Date('2026-05-28');
 
   let seed = 987654;
   function rand() {
@@ -386,16 +386,16 @@ function generateDatabase() {
   function randInt(min, max) { return Math.floor(rand() * (max - min + 1)) + min; }
   function randItem(arr) { return arr[Math.floor(rand() * arr.length)]; }
 
-  const stages    = ['Interested', 'Follow Up', 'Not Connected', 'Invalid', 'Enrolled'];
-  const weights   = [0.25, 0.35, 0.20, 0.10, 0.10];
-  const sources   = ['Google Search', 'LinkedIn Ad', 'Meta Ads', 'Organic Referral', 'Direct Visit'];
+  const stages = ['Interested', 'Follow Up', 'Not Connected', 'Invalid', 'Enrolled'];
+  const weights = [0.25, 0.35, 0.20, 0.10, 0.10];
+  const sources = ['Google Search', 'LinkedIn Ad', 'Meta Ads', 'Organic Referral', 'Direct Visit'];
   const campaigns = ['Summer Push 2026', 'MBA Awareness', 'AI Masters Q2', 'Referral Boost', 'Remarketing Wave'];
 
   const payAmounts = {
-    'Online MBA':              { full: 120000, token: 25000 },
-    'Advanced AI/ML':          { full: 75000,  token: 15000 },
-    'M.Tech Data Science':     { full: 100000, token: 20000 },
-    'Executive Cybersecurity': { full: 60000,  token: 10000 }
+    'Online MBA': { full: 120000, token: 25000 },
+    'Advanced AI/ML': { full: 75000, token: 15000 },
+    'M.Tech Data Science': { full: 100000, token: 20000 },
+    'Executive Cybersecurity': { full: 60000, token: 10000 }
   };
 
   ALL_TLS.forEach(tl => {
@@ -406,16 +406,16 @@ function generateDatabase() {
 
         // --- Calls ---
         const avgCalls = tl.name === 'Rahul' ? 65 : tl.name === 'Priya' ? 72 : 58;
-        const dailyCalls     = randInt(avgCalls - 15, avgCalls + 15);
+        const dailyCalls = randInt(avgCalls - 15, avgCalls + 15);
         const dailyConnected = Math.floor(dailyCalls * randInt(25, 42) / 100);
-        const dailyTalkSec   = dailyConnected * randInt(90, 180);
+        const dailyTalkSec = dailyConnected * randInt(90, 180);
 
         calls.push({
-          date:      dateStr,
-          bde:       bde,
-          tl:        tl.name,
-          program:   tl.program,
-          calls:     dailyCalls,
+          date: dateStr,
+          bde: bde,
+          tl: tl.name,
+          program: tl.program,
+          calls: dailyCalls,
           connected: dailyConnected,
           talkTimeMin: Math.round(dailyTalkSec / 60)
         });
@@ -431,29 +431,29 @@ function generateDatabase() {
             if (stageRand <= cum) { stage = stages[s]; break; }
           }
           leads.push({
-            date:     dateStr,
-            bde:      bde,
-            tl:       tl.name,
-            program:  tl.program,
-            stage:    stage,
-            source:   randItem(sources),
+            date: dateStr,
+            bde: bde,
+            tl: tl.name,
+            program: tl.program,
+            stage: stage,
+            source: randItem(sources),
             campaign: randItem(campaigns)
           });
         }
 
         // --- Payments (occasional) ---
-        const dayOfWeek    = d.getDay();
+        const dayOfWeek = d.getDay();
         const paymentChance = dayOfWeek === 0 ? 0.05 : 0.22;
         if (rand() < paymentChance) {
           const isFullPay = rand() > 0.6;
-          const amts      = payAmounts[tl.program];
+          const amts = payAmounts[tl.program];
           payments.push({
-            date:    dateStr,
-            bde:     bde,
-            tl:      tl.name,
+            date: dateStr,
+            bde: bde,
+            tl: tl.name,
             program: tl.program,
-            amount:  isFullPay ? amts.full : amts.token,
-            type:    isFullPay ? 'Full Enrollment' : 'Token Booking'
+            amount: isFullPay ? amts.full : amts.token,
+            type: isFullPay ? 'Full Enrollment' : 'Token Booking'
           });
         }
       }
@@ -470,8 +470,8 @@ const DB = generateDatabase();
 // ==========================================
 function fCurrency(n) {
   if (n >= 10000000) return '₹' + (n / 10000000).toFixed(2) + ' Cr';
-  if (n >= 100000)   return '₹' + (n / 100000).toFixed(2) + ' L';
-  if (n >= 1000)     return '₹' + (n / 1000).toFixed(1) + ' K';
+  if (n >= 100000) return '₹' + (n / 100000).toFixed(2) + ' L';
+  if (n >= 1000) return '₹' + (n / 1000).toFixed(1) + ' K';
   return '₹' + n.toLocaleString('en-IN');
 }
 
@@ -519,15 +519,15 @@ function filterData(arr) {
   const myTLNames = getMyTLNames();
   return arr.filter(item => {
     const inMyTeam = myTLNames.includes(item.tl);
-    const inDate   = item.date >= activeFilters.dateFrom && item.date <= activeFilters.dateTo;
-    const inTL     = activeFilters.tl  === 'ALL' || item.tl  === activeFilters.tl;
-    const inBDE    = activeFilters.bde === 'ALL' || item.bde === activeFilters.bde;
+    const inDate = item.date >= activeFilters.dateFrom && item.date <= activeFilters.dateTo;
+    const inTL = activeFilters.tl === 'ALL' || item.tl === activeFilters.tl;
+    const inBDE = activeFilters.bde === 'ALL' || item.bde === activeFilters.bde;
     return inMyTeam && inDate && inTL && inBDE;
   });
 }
 
-function filteredCalls()    { return filterData(DB.calls);    }
-function filteredLeads()    { return filterData(DB.leads);    }
+function filteredCalls() { return filterData(DB.calls); }
+function filteredLeads() { return filterData(DB.leads); }
 function filteredPayments() { return filterData(DB.payments); }
 
 // ==========================================
@@ -564,7 +564,7 @@ function showLoginScreen() {
 function handleLogin() {
   const username = document.getElementById('login-username').value.trim().toLowerCase();
   const password = document.getElementById('login-password').value;
-  const errorEl  = document.getElementById('login-error');
+  const errorEl = document.getElementById('login-error');
 
   if (GM_USERS[username] && GM_USERS[username].password === password) {
     errorEl.classList.remove('show');
@@ -637,7 +637,7 @@ function initDashboard() {
   // Set dates
   userSelectedDate = true;
   lastAppliedDateOption = 'today';
-  
+
   const today = new Date();
   const toISODate = (date) => {
     const y = date.getFullYear();
@@ -646,13 +646,13 @@ function initDashboard() {
     return `${y}-${m}-${d}`;
   };
   const todayStr = toISODate(today);
-  
+
   activeFilters.dateFrom = todayStr;
-  activeFilters.dateTo   = todayStr;
-  
+  activeFilters.dateTo = todayStr;
+
   document.getElementById('date-from').value = todayStr;
-  document.getElementById('date-to').value   = todayStr;
-  
+  document.getElementById('date-to').value = todayStr;
+
   const filterDateEl = document.getElementById('filter-date');
   if (filterDateEl) filterDateEl.value = 'today';
   updateDateDisplayLabel();
@@ -672,7 +672,7 @@ function populateGMFilterFromUsers() {
   if (!gmSel) return;
   const current = gmSel.value;
   gmSel.innerHTML = '';
-  
+
   const allowed = getAllowedGMs();
   if (allowed.length > 1) {
     gmSel.innerHTML = '<option value="ALL">All GMs</option>';
@@ -683,7 +683,7 @@ function populateGMFilterFromUsers() {
     opt.textContent = name;
     gmSel.appendChild(opt);
   });
-  
+
   if (allowed.length === 1) {
     activeFilters.gm = allowed[0];
   } else if (!allowed.includes(current)) {
@@ -692,7 +692,7 @@ function populateGMFilterFromUsers() {
     activeFilters.gm = current;
   }
   gmSel.value = activeFilters.gm;
-  
+
   const gmFilterGroup = document.getElementById('gm-filter-group');
   if (gmFilterGroup) {
     gmFilterGroup.style.display = allowed.length <= 1 ? 'none' : 'flex';
@@ -703,7 +703,7 @@ function populateGMFilterFromUsers() {
 function populateProgramFilter() {
   const progSelect = document.getElementById('filter-program');
   progSelect.innerHTML = '<option value="ALL">All Programs</option>';
-  
+
   let tls = [];
   if (activeFilters.gm === 'ALL') {
     Object.keys(USERS).forEach(username => {
@@ -713,7 +713,7 @@ function populateProgramFilter() {
     const gm = activeFilters.gm || currentUser || 'umang';
     tls = USERS[gm] ? USERS[gm].tls : [];
   }
-  
+
   const uniquePrograms = [...new Set(tls.map(tl => tl.program))];
   uniquePrograms.forEach(prog => {
     const opt = document.createElement('option');
@@ -728,7 +728,7 @@ function populateProgramFilter() {
 function populateTLFilter() {
   const tlSelect = document.getElementById('filter-tl');
   tlSelect.innerHTML = '<option value="ALL">All TLs</option>';
-  
+
   let tls = [];
   if (activeFilters.gm === 'ALL') {
     Object.keys(USERS).forEach(username => {
@@ -769,36 +769,36 @@ function populateBDEFilter(tlName) {
 // FILTER APPLY — cascades: Program → TL → BDE
 // ==========================================
 function applyFilters() {
-  const prevGM      = activeFilters.gm;
+  const prevGM = activeFilters.gm;
   const prevProgram = activeFilters.program;
-  const prevTL      = activeFilters.tl;
+  const prevTL = activeFilters.tl;
 
   if (document.getElementById('filter-gm')) {
     activeFilters.gm = document.getElementById('filter-gm').value;
   }
-  activeFilters.program  = document.getElementById('filter-program').value;
-  activeFilters.tl       = document.getElementById('filter-tl').value;
-  activeFilters.bde      = document.getElementById('filter-bde').value;
+  activeFilters.program = document.getElementById('filter-program').value;
+  activeFilters.tl = document.getElementById('filter-tl').value;
+  activeFilters.bde = document.getElementById('filter-bde').value;
   activeFilters.dateFrom = document.getElementById('date-from').value;
-  activeFilters.dateTo   = document.getElementById('date-to').value;
+  activeFilters.dateTo = document.getElementById('date-to').value;
 
   if (usesCSVProdData()) {
     if (activeFilters.gm !== prevGM) {
       activeFilters.program = 'ALL';
-      activeFilters.tl      = 'ALL';
-      activeFilters.bde     = 'ALL';
+      activeFilters.tl = 'ALL';
+      activeFilters.bde = 'ALL';
       populateProdPrograms();
       populateProdTLs();
       populateProdBDEs('ALL');
       document.getElementById('filter-program').value = 'ALL';
-      document.getElementById('filter-tl').value      = 'ALL';
-      document.getElementById('filter-bde').value     = 'ALL';
+      document.getElementById('filter-tl').value = 'ALL';
+      document.getElementById('filter-bde').value = 'ALL';
     } else if (activeFilters.program !== prevProgram) {
-      activeFilters.tl  = 'ALL';
+      activeFilters.tl = 'ALL';
       activeFilters.bde = 'ALL';
       populateProdTLs();
       populateProdBDEs('ALL');
-      document.getElementById('filter-tl').value  = 'ALL';
+      document.getElementById('filter-tl').value = 'ALL';
       document.getElementById('filter-bde').value = 'ALL';
     } else if (activeFilters.tl !== prevTL) {
       activeFilters.bde = 'ALL';
@@ -809,20 +809,20 @@ function applyFilters() {
     // Lead Report / Lead Analysis: cascade using CSV data
     if (activeFilters.gm !== prevGM) {
       activeFilters.program = 'ALL';
-      activeFilters.tl      = 'ALL';
-      activeFilters.bde     = 'ALL';
+      activeFilters.tl = 'ALL';
+      activeFilters.bde = 'ALL';
       populateLAPrograms();
       populateLATLs();
       populateLABDEs('ALL');
       document.getElementById('filter-program').value = 'ALL';
-      document.getElementById('filter-tl').value      = 'ALL';
-      document.getElementById('filter-bde').value     = 'ALL';
+      document.getElementById('filter-tl').value = 'ALL';
+      document.getElementById('filter-bde').value = 'ALL';
     } else if (activeFilters.program !== prevProgram) {
-      activeFilters.tl  = 'ALL';
+      activeFilters.tl = 'ALL';
       activeFilters.bde = 'ALL';
       populateLATLs();
       populateLABDEs('ALL');
-      document.getElementById('filter-tl').value  = 'ALL';
+      document.getElementById('filter-tl').value = 'ALL';
       document.getElementById('filter-bde').value = 'ALL';
     } else if (activeFilters.tl !== prevTL) {
       activeFilters.bde = 'ALL';
@@ -832,21 +832,21 @@ function applyFilters() {
   } else if (usesCSVRevData()) {
     if (activeFilters.gm !== prevGM) {
       activeFilters.program = 'ALL';
-      activeFilters.tl      = 'ALL';
-      activeFilters.bde     = 'ALL';
+      activeFilters.tl = 'ALL';
+      activeFilters.bde = 'ALL';
       populateRevPrograms();
       populateRevTLs();
       populateRevBDEs('ALL');
       document.getElementById('filter-program').value = 'ALL';
-      document.getElementById('filter-tl').value      = 'ALL';
-      document.getElementById('filter-bde').value     = 'ALL';
+      document.getElementById('filter-tl').value = 'ALL';
+      document.getElementById('filter-bde').value = 'ALL';
       if (cohortLoaded) applyCohortDateRangeForFilters();
     } else if (activeFilters.program !== prevProgram) {
-      activeFilters.tl  = 'ALL';
+      activeFilters.tl = 'ALL';
       activeFilters.bde = 'ALL';
       populateRevTLs();
       populateRevBDEs('ALL');
-      document.getElementById('filter-tl').value  = 'ALL';
+      document.getElementById('filter-tl').value = 'ALL';
       document.getElementById('filter-bde').value = 'ALL';
       if (cohortLoaded) applyCohortDateRangeForFilters();
     } else if (activeFilters.tl !== prevTL) {
@@ -858,16 +858,16 @@ function applyFilters() {
     // Other views: cascade using USERS config data
     if (activeFilters.gm !== prevGM) {
       activeFilters.program = 'ALL';
-      activeFilters.tl      = 'ALL';
-      activeFilters.bde     = 'ALL';
+      activeFilters.tl = 'ALL';
+      activeFilters.bde = 'ALL';
 
       populateProgramFilter();
       populateTLFilter();
       populateBDEFilter('ALL');
 
       document.getElementById('filter-program').value = 'ALL';
-      document.getElementById('filter-tl').value      = 'ALL';
-      document.getElementById('filter-bde').value     = 'ALL';
+      document.getElementById('filter-tl').value = 'ALL';
+      document.getElementById('filter-bde').value = 'ALL';
 
       let gmLabel = 'All GMs';
       let avatarChar = 'A';
@@ -880,11 +880,11 @@ function applyFilters() {
       document.getElementById('sidebar-avatar').textContent = avatarChar;
       document.getElementById('sidebar-username').textContent = gmLabel;
     } else if (activeFilters.program !== prevProgram) {
-      activeFilters.tl  = 'ALL';
+      activeFilters.tl = 'ALL';
       activeFilters.bde = 'ALL';
       populateTLFilter();
       populateBDEFilter('ALL');
-      document.getElementById('filter-tl').value  = 'ALL';
+      document.getElementById('filter-tl').value = 'ALL';
       document.getElementById('filter-bde').value = 'ALL';
     } else if (activeFilters.tl !== prevTL) {
       activeFilters.bde = 'ALL';
@@ -901,11 +901,11 @@ function applyFilters() {
 // NAVIGATION
 // ==========================================
 const VIEW_TITLES = {
-  overview:       'Overview',
-  revenue:        'Revenue',
-  productivity:   'Productivity',
-  leads:          'Lead Report',
-  'lead-analysis':'Lead Analysis'
+  overview: 'Overview',
+  revenue: 'Revenue',
+  productivity: 'Productivity',
+  leads: 'Lead Report',
+  'lead-analysis': 'Lead Analysis'
 };
 
 function switchView(viewId) {
@@ -924,7 +924,7 @@ function switchView(viewId) {
   document.getElementById('sidebar').classList.remove('mobile-open');
 
   const wasCSVView = isCSVFilterView(prevView);
-  const isCSVView  = isCSVFilterView(viewId);
+  const isCSVView = isCSVFilterView(viewId);
 
   // Restore USERS-based dropdowns when leaving CSV-powered views
   if (wasCSVView && !isCSVView) {
@@ -961,11 +961,11 @@ function toggleSidebar() {
 
 function renderActiveView() {
   switch (activeView) {
-    case 'overview':       renderOverview();       break;
-    case 'revenue':        renderRevenue();        break;
-    case 'productivity':   renderProductivity();   break;
-    case 'leads':          renderLeads();          break;
-    case 'lead-analysis':  renderLeadAnalysis();   break;
+    case 'overview': renderOverview(); break;
+    case 'revenue': renderRevenue(); break;
+    case 'productivity': renderProductivity(); break;
+    case 'leads': renderLeads(); break;
+    case 'lead-analysis': renderLeadAnalysis(); break;
   }
 }
 
@@ -995,18 +995,18 @@ function renderOverview() {
     const currentEnrollments = revFullRows.filter(r => revMatchesFilters(r, 'fullPayDate'));
 
     const totalTokens = revTokenRows.filter(r => {
-      const inGM      = activeFilters.gm      === 'ALL' ? isGMAllowed(r.gm) : r.gm      === activeFilters.gm;
-      const inProgram = activeFilters.program === 'ALL' || r.type    === activeFilters.program;
-      const inTL      = activeFilters.tl      === 'ALL' || r.tl      === activeFilters.tl;
-      const inBDE     = activeFilters.bde     === 'ALL' || r.bdMail  === activeFilters.bde;
+      const inGM = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
+      const inProgram = activeFilters.program === 'ALL' || r.type === activeFilters.program;
+      const inTL = activeFilters.tl === 'ALL' || r.tl === activeFilters.tl;
+      const inBDE = activeFilters.bde === 'ALL' || r.bdMail === activeFilters.bde;
       return inGM && inProgram && inTL && inBDE;
     });
 
     const totalEnrollments = revFullRows.filter(r => {
-      const inGM      = activeFilters.gm      === 'ALL' ? isGMAllowed(r.gm) : r.gm      === activeFilters.gm;
-      const inProgram = activeFilters.program === 'ALL' || r.type    === activeFilters.program;
-      const inTL      = activeFilters.tl      === 'ALL' || r.tl      === activeFilters.tl;
-      const inBDE     = activeFilters.bde     === 'ALL' || r.bdMail  === activeFilters.bde;
+      const inGM = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
+      const inProgram = activeFilters.program === 'ALL' || r.type === activeFilters.program;
+      const inTL = activeFilters.tl === 'ALL' || r.tl === activeFilters.tl;
+      const inBDE = activeFilters.bde === 'ALL' || r.bdMail === activeFilters.bde;
       return inGM && inProgram && inTL && inBDE;
     });
 
@@ -1024,9 +1024,9 @@ function renderOverview() {
   // 5. Avg Dialled & 6. Avg CC & 7. Avg TT
   if (prodLoaded) {
     const cData = getOverviewProdData();
-    const avgDialled    = prodAvgCall(cData);
-    const avgConnected  = prodAvgCC(cData);
-    const avgTT         = prodAvgTT(cData);
+    const avgDialled = prodAvgCall(cData);
+    const avgConnected = prodAvgCC(cData);
+    const avgTT = prodAvgTT(cData);
 
     setText('ov-avg-dialled', avgDialled);
     setText('ov-avg-connected', avgConnected);
@@ -1045,10 +1045,10 @@ function renderOverview() {
     const durationCVR = durationLeadsCount ? ((durationEnrolledCount / durationLeadsCount) * 100).toFixed(2) : '0.00';
 
     const totalLeads = laAllRows.filter(r => {
-      const inGM      = activeFilters.gm      === 'ALL' ? isGMAllowed(r.gm) : r.gm      === activeFilters.gm;
+      const inGM = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
       const inProgram = activeFilters.program === 'ALL' || r.program === activeFilters.program;
-      const inTL      = activeFilters.tl      === 'ALL' || r.tl      === activeFilters.tl;
-      const inBDE     = activeFilters.bde     === 'ALL' || r.owner   === activeFilters.bde;
+      const inTL = activeFilters.tl === 'ALL' || r.tl === activeFilters.tl;
+      const inBDE = activeFilters.bde === 'ALL' || r.owner === activeFilters.bde;
       return inGM && inProgram && inTL && inBDE;
     });
     const totalLeadsCount = totalLeads.length;
@@ -1075,27 +1075,27 @@ function renderOverview() {
 // ==========================================
 function mapTokenRow(obj) {
   return {
-    gm:          (obj['GM'] || '').trim(),
-    type:        (obj['Type'] || '').trim(),
-    cohortName:  (obj['Cohort Name'] || '').trim(),
-    tl:          (obj['TL Name'] || '').trim(),
-    bdMail:      (obj['BD Mail'] || '').trim(),
-    tokenDate:   parseSheetDate(obj['Token date']),
+    gm: (obj['GM'] || '').trim(),
+    type: (obj['Type'] || '').trim(),
+    cohortName: (obj['Cohort Name'] || '').trim(),
+    tl: (obj['TL Name'] || '').trim(),
+    bdMail: (obj['BD Mail'] || '').trim(),
+    tokenDate: parseSheetDate(obj['Token date']),
     tokenAmount: parseNum(obj['Token Amount']),
-    candidate:   obj['Candidate name'] || '',
+    candidate: obj['Candidate name'] || '',
   };
 }
 
 function mapFullPayRow(obj) {
   return {
-    gm:          (obj['GM'] || '').trim(),
-    type:        (obj['Type'] || '').trim(),
-    cohortName:  (obj['Cohort Name'] || '').trim(),
-    tl:          (obj['TL Name'] || '').trim(),
-    bdMail:      (obj['BD Mail'] || '').trim(),
+    gm: (obj['GM'] || '').trim(),
+    type: (obj['Type'] || '').trim(),
+    cohortName: (obj['Cohort Name'] || '').trim(),
+    tl: (obj['TL Name'] || '').trim(),
+    bdMail: (obj['BD Mail'] || '').trim(),
     fullPayDate: parseSheetDate(obj['Full payment date']),
-    amountPaid:  parseNum(obj['Amount Paid']),
-    candidate:   obj['Candidate name'] || '',
+    amountPaid: parseNum(obj['Amount Paid']),
+    candidate: obj['Candidate name'] || '',
   };
 }
 
@@ -1104,16 +1104,16 @@ function mapCohortRow(obj) {
     .map(k => (obj[k] || '').trim())
     .filter(Boolean);
   return {
-    programName:          (obj['Program Name'] || '').trim(),
-    cohortName:           (obj['Cohort Name'] || '').trim(),
-    startDate:            parseSheetDate(obj['Cohort Start Date']),
-    endDate:              parseSheetDate(obj['Cohort End Date']),
-    cohortTarget:         parseNum(obj['Cohort Target']),
-    gmTarget:             parseNum(obj['GM Target']),
-    gm:                   (obj['GM'] || '').trim(),
+    programName: (obj['Program Name'] || '').trim(),
+    cohortName: (obj['Cohort Name'] || '').trim(),
+    startDate: parseSheetDate(obj['Cohort Start Date']),
+    endDate: parseSheetDate(obj['Cohort End Date']),
+    cohortTarget: parseNum(obj['Cohort Target']),
+    gmTarget: parseNum(obj['GM Target']),
+    gm: (obj['GM'] || '').trim(),
     tls,
     targetPerMonthPerBDA: parseNum(obj['Target Per Month Per BDA']),
-    targetPerDayPerBDA:   parseNum(obj['Target Per Day Per BDA']),
+    targetPerDayPerBDA: parseNum(obj['Target Per Day Per BDA']),
   };
 }
 
@@ -1145,7 +1145,7 @@ function cohortGmBaseTarget(cohort) {
 function revGetFilterDateRange() {
   return {
     start: activeFilters.dateFrom || '',
-    end:   activeFilters.dateTo   || activeFilters.dateFrom || '',
+    end: activeFilters.dateTo || activeFilters.dateFrom || '',
   };
 }
 
@@ -1166,22 +1166,22 @@ function calculateProratedCohortTarget(cohort, filterStart, filterEnd) {
   }
 
   const cohortStart = cohort.startDate;
-  const cohortEnd   = cohort.endDate;
-  const totalDays   = cohortDayCount(cohortStart, cohortEnd);
-  const perDay      = cohort.cohortTarget / totalDays;
-  const fullTarget  = cohort.cohortTarget;
+  const cohortEnd = cohort.endDate;
+  const totalDays = cohortDayCount(cohortStart, cohortEnd);
+  const perDay = cohort.cohortTarget / totalDays;
+  const fullTarget = cohort.cohortTarget;
 
   const fStart = filterStart || cohortStart;
-  const fEnd   = filterEnd   || cohortEnd;
+  const fEnd = filterEnd || cohortEnd;
 
   if (fEnd < cohortStart || fStart > cohortEnd) {
     return { target: 0, perDay, elapsedDays: 0, totalDays, fullTarget };
   }
 
   const effectiveStart = clampTargetDateStr(fStart, cohortStart, cohortEnd);
-  const effectiveEnd   = clampTargetDateStr(fEnd, cohortStart, cohortEnd);
-  const elapsedDays    = cohortDayCount(effectiveStart, effectiveEnd);
-  const target         = perDay * elapsedDays;
+  const effectiveEnd = clampTargetDateStr(fEnd, cohortStart, cohortEnd);
+  const elapsedDays = cohortDayCount(effectiveStart, effectiveEnd);
+  const target = perDay * elapsedDays;
 
   return {
     target: Math.round(target * 10) / 10,
@@ -1198,19 +1198,19 @@ function calculateProratedBdaTarget(cohort, filterStart, filterEnd) {
     return { target: 0, perDay: 0 };
   }
 
-  const perDay       = cohort.targetPerMonthPerBDA / 30;
-  const cohortStart  = cohort.startDate;
-  const cohortEnd    = cohort.endDate;
-  const fStart       = filterStart || cohortStart;
-  const fEnd         = filterEnd   || cohortEnd;
+  const perDay = cohort.targetPerMonthPerBDA / 30;
+  const cohortStart = cohort.startDate;
+  const cohortEnd = cohort.endDate;
+  const fStart = filterStart || cohortStart;
+  const fEnd = filterEnd || cohortEnd;
 
   if (fEnd < cohortStart || fStart > cohortEnd) {
     return { target: 0, perDay };
   }
 
   const effectiveStart = clampTargetDateStr(fStart, cohortStart, cohortEnd);
-  const effectiveEnd   = clampTargetDateStr(fEnd, cohortStart, cohortEnd);
-  const elapsedDays    = cohortDayCount(effectiveStart, effectiveEnd);
+  const effectiveEnd = clampTargetDateStr(fEnd, cohortStart, cohortEnd);
+  const elapsedDays = cohortDayCount(effectiveStart, effectiveEnd);
 
   return {
     target: Math.round(perDay * elapsedDays * 10) / 10,
@@ -1280,7 +1280,7 @@ function revScopedTarget(contextRows) {
   let total = 0, perDay = 0;
   programs.forEach(p => {
     const r = revProratedCohortForProgram(p);
-    total  += r.target;
+    total += r.target;
     perDay += r.perDay;
   });
   return { total, perDay };
@@ -1300,7 +1300,7 @@ function revRowsCohortTarget(contextRows, gmName) {
     const baseTarget = cohortGmBaseTarget(cohort);
     if (!baseTarget) return;
     const result = calculateProratedCohortTarget({ ...cohort, cohortTarget: baseTarget }, start, end);
-    total  += result.target;
+    total += result.target;
     perDay += result.perDay;
   });
   return { total, perDay };
@@ -1317,7 +1317,7 @@ function revBdaRowsCohortTarget(contextRows) {
     const cohort = findCohortTarget(prog);
     if (!cohort) return;
     const result = calculateProratedBdaTarget(cohort, start, end);
-    total  += result.target;
+    total += result.target;
     perDay += result.perDay;
   });
   return { total, perDay };
@@ -1328,7 +1328,7 @@ function revBdaRowsCohortTarget(contextRows) {
 function revTlRowsCohortTarget(tlName) {
   if (!cohortLoaded || !tlName) return { total: 0, perDay: 0 };
 
-  const gmFilter   = activeFilters.gm !== 'ALL' ? activeFilters.gm : '';
+  const gmFilter = activeFilters.gm !== 'ALL' ? activeFilters.gm : '';
   const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
   const { start, end } = revGetFilterDateRange();
   let total = 0, perDay = 0;
@@ -1345,7 +1345,7 @@ function revTlRowsCohortTarget(tlName) {
     if (!tls.length || !baseTarget) return;
 
     const result = calculateProratedCohortTarget({ ...cohort, cohortTarget: baseTarget }, start, end);
-    total  += result.target / tls.length;
+    total += result.target / tls.length;
     perDay += result.perDay / tls.length;
   });
   return { total, perDay };
@@ -1367,7 +1367,7 @@ function findCohortTarget(programName, cohortName) {
 function cohortDayCount(startDate, endDate) {
   if (!startDate || !endDate) return 1;
   const start = new Date(startDate + 'T00:00:00');
-  const end   = new Date(endDate + 'T00:00:00');
+  const end = new Date(endDate + 'T00:00:00');
   return Math.max(1, Math.round((end - start) / 86400000) + 1);
 }
 
@@ -1412,8 +1412,8 @@ function buildInputBdaRosterMap() {
 }
 
 function getRevenueBdaEmails(scope = {}) {
-  const gm  = scope.gm  !== undefined ? scope.gm  : activeFilters.gm;
-  const tl  = scope.tl  !== undefined ? scope.tl  : activeFilters.tl;
+  const gm = scope.gm !== undefined ? scope.gm : activeFilters.gm;
+  const tl = scope.tl !== undefined ? scope.tl : activeFilters.tl;
   const bde = scope.bde !== undefined ? scope.bde : activeFilters.bde;
   const program = scope.program ?? activeFilters.program;
 
@@ -1500,8 +1500,8 @@ function inputBdaMatchesFilter(bda, filterBde) {
 
 function getInputBdaRoster(scope = {}) {
   const rosterMap = buildInputBdaRosterMap();
-  const gm  = scope.gm  !== undefined ? scope.gm  : activeFilters.gm;
-  const tl  = scope.tl  !== undefined ? scope.tl  : activeFilters.tl;
+  const gm = scope.gm !== undefined ? scope.gm : activeFilters.gm;
+  const tl = scope.tl !== undefined ? scope.tl : activeFilters.tl;
   const bde = scope.bde !== undefined ? scope.bde : activeFilters.bde;
 
   let list = [...rosterMap.values()];
@@ -1521,29 +1521,29 @@ function applyCohortDateRangeForFilters() {
   if (!cohortLoaded || !cohortTargetRows.length) return false;
 
   let startDate = '';
-  let endDate   = '';
+  let endDate = '';
 
   if (activeFilters.program !== 'ALL') {
     const cohort = findCohortTarget(activeFilters.program);
     if (!cohort) return false;
     startDate = cohort.startDate;
-    endDate   = cohort.endDate;
+    endDate = cohort.endDate;
   } else {
     const starts = cohortTargetRows.map(r => r.startDate).filter(Boolean).sort();
-    const ends   = cohortTargetRows.map(r => r.endDate).filter(Boolean).sort();
+    const ends = cohortTargetRows.map(r => r.endDate).filter(Boolean).sort();
     if (!starts.length) return false;
     startDate = starts[0];
-    endDate   = ends[ends.length - 1];
+    endDate = ends[ends.length - 1];
   }
 
   if (!startDate || !endDate) return false;
 
   activeFilters.dateFrom = startDate;
-  activeFilters.dateTo   = endDate;
+  activeFilters.dateTo = endDate;
   const dateFromEl = document.getElementById('date-from');
-  const dateToEl   = document.getElementById('date-to');
+  const dateToEl = document.getElementById('date-to');
   if (dateFromEl) dateFromEl.value = startDate;
-  if (dateToEl)   dateToEl.value   = endDate;
+  if (dateToEl) dateToEl.value = endDate;
 
   const filterDateEl = document.getElementById('filter-date');
   if (filterDateEl) filterDateEl.value = 'custom';
@@ -1555,12 +1555,12 @@ function applyCohortDateRangeForFilters() {
 
 function revMatchesFilters(row, dateField) {
   const dt = row[dateField];
-  const inDate    = (!activeFilters.dateFrom || dt >= activeFilters.dateFrom) &&
-                    (!activeFilters.dateTo   || dt <= activeFilters.dateTo);
-  const inGM      = activeFilters.gm      === 'ALL' ? isGMAllowed(row.gm) : row.gm      === activeFilters.gm;
-  const inProgram = activeFilters.program === 'ALL' || row.type    === activeFilters.program;
-  const inTL      = activeFilters.tl      === 'ALL' || row.tl      === activeFilters.tl;
-  const inBDE     = activeFilters.bde     === 'ALL' || row.bdMail  === activeFilters.bde;
+  const inDate = (!activeFilters.dateFrom || dt >= activeFilters.dateFrom) &&
+    (!activeFilters.dateTo || dt <= activeFilters.dateTo);
+  const inGM = activeFilters.gm === 'ALL' ? isGMAllowed(row.gm) : row.gm === activeFilters.gm;
+  const inProgram = activeFilters.program === 'ALL' || row.type === activeFilters.program;
+  const inTL = activeFilters.tl === 'ALL' || row.tl === activeFilters.tl;
+  const inBDE = activeFilters.bde === 'ALL' || row.bdMail === activeFilters.bde;
   return inDate && inGM && inProgram && inTL && inBDE;
 }
 
@@ -1618,7 +1618,7 @@ function populateRevGlobalFilters() {
       opt.textContent = name;
       gmSel.appendChild(opt);
     });
-    
+
     const allowed = getAllowedGMs();
     if (allowed.length === 1) {
       activeFilters.gm = allowed[0];
@@ -1628,7 +1628,7 @@ function populateRevGlobalFilters() {
       activeFilters.gm = current;
     }
     gmSel.value = activeFilters.gm;
-    
+
     const gmFilterGroup = document.getElementById('gm-filter-group');
     if (gmFilterGroup) {
       gmFilterGroup.style.display = allowed.length <= 1 ? 'none' : 'flex';
@@ -1663,7 +1663,7 @@ function populateRevTLs() {
   const sel = document.getElementById('filter-tl');
   if (!sel) return;
   let pool = revTokenRows;
-  if (activeFilters.gm !== 'ALL')      pool = pool.filter(r => r.gm === activeFilters.gm);
+  if (activeFilters.gm !== 'ALL') pool = pool.filter(r => r.gm === activeFilters.gm);
   if (activeFilters.program !== 'ALL') pool = pool.filter(r => r.type === activeFilters.program);
   const tls = [...new Set(pool.map(r => r.tl).filter(Boolean))].sort();
   sel.innerHTML = '<option value="ALL">All TLs</option>';
@@ -1681,9 +1681,9 @@ function populateRevBDEs(tlName) {
   const sel = document.getElementById('filter-bde');
   if (!sel) return;
   let pool = revTokenRows;
-  if (activeFilters.gm !== 'ALL')      pool = pool.filter(r => r.gm === activeFilters.gm);
+  if (activeFilters.gm !== 'ALL') pool = pool.filter(r => r.gm === activeFilters.gm);
   if (activeFilters.program !== 'ALL') pool = pool.filter(r => r.type === activeFilters.program);
-  if (tlName && tlName !== 'ALL')      pool = pool.filter(r => r.tl === tlName);
+  if (tlName && tlName !== 'ALL') pool = pool.filter(r => r.tl === tlName);
   const bdes = [...new Set(pool.map(r => r.bdMail).filter(Boolean))].sort();
   sel.innerHTML = '<option value="ALL">All BDEs</option>';
   bdes.forEach(b => {
@@ -1718,12 +1718,12 @@ async function fetchRevenueCSV() {
       ensureInputMappingLoaded(),
     ]);
     if (!tokenResp.ok) throw new Error(`Token CSV HTTP ${tokenResp.status}`);
-    if (!fullResp.ok)  throw new Error(`Full Payment CSV HTTP ${fullResp.status}`);
+    if (!fullResp.ok) throw new Error(`Full Payment CSV HTTP ${fullResp.status}`);
 
     const tokenRaw = parseCSV(await tokenResp.text());
-    const fullRaw  = parseCSV(await fullResp.text());
+    const fullRaw = parseCSV(await fullResp.text());
     revTokenRows = tokenRaw.map(mapTokenRow).filter(r => r.tokenDate);
-    revFullRows  = fullRaw.map(mapFullPayRow).filter(r => r.fullPayDate || r.amountPaid > 0);
+    revFullRows = fullRaw.map(mapFullPayRow).filter(r => r.fullPayDate || r.amountPaid > 0);
 
     if (cohortResp.ok) {
       cohortTargetRows = parseCSV(await cohortResp.text())
@@ -1744,11 +1744,11 @@ async function fetchRevenueCSV() {
           const dates = revTokenRows.map(r => r.tokenDate).filter(Boolean).sort();
           if (dates.length) {
             activeFilters.dateFrom = dates[0];
-            activeFilters.dateTo   = dates[dates.length - 1];
+            activeFilters.dateTo = dates[dates.length - 1];
             const dateFromEl = document.getElementById('date-from');
-            const dateToEl   = document.getElementById('date-to');
+            const dateToEl = document.getElementById('date-to');
             if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
-            if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+            if (dateToEl) dateToEl.value = activeFilters.dateTo;
 
             const filterDateEl = document.getElementById('filter-date');
             if (filterDateEl) filterDateEl.value = 'custom';
@@ -1778,19 +1778,19 @@ function renderRevenue() {
   if (!prodLoaded) return;
 
   const tokenData = getBaseRevTokens();
-  const fullData  = getBaseRevFullPayments();
+  const fullData = getBaseRevFullPayments();
 
   const tokenAgg = revAggTokens(tokenData);
-  const fullAgg  = revAggFull(fullData);
-  const tokenRev  = tokenAgg.amount;
-  const fullRev   = fullAgg.amount;
+  const fullAgg = revAggFull(fullData);
+  const tokenRev = tokenAgg.amount;
+  const fullRev = fullAgg.amount;
   const tokenCount = tokenAgg.count;
-  const fullCount  = fullAgg.count;
-  const totalRev   = tokenRev + fullRev;
+  const fullCount = fullAgg.count;
+  const totalRev = tokenRev + fullRev;
 
   setText('rev-total', fCurrency(totalRev));
   setText('rev-total-sub', 'collected');
-  setText('rev-full',  fNum(fullCount));
+  setText('rev-full', fNum(fullCount));
   setText('rev-full-sub', fCurrency(fullRev));
   setText('rev-tokens', fNum(tokenCount));
   setText('rev-tokens-sub', fCurrency(tokenRev));
@@ -1807,9 +1807,13 @@ function renderRevenue() {
     setText('rev-target-sub', cohortLoaded ? 'No target for date range' : 'Loading targets…');
   }
 
-  // Target (Unit wise) — grouped by Type (Program)
-  const targetUnitsContainer = document.getElementById('rev-target-units');
-  targetUnitsContainer.innerHTML = '';
+  // Target Token (Unit wise) & Target Full Enrollment (Unit wise)
+  const tokenUnitsContainer = document.getElementById('rev-target-token-units');
+  const enrollmentUnitsContainer = document.getElementById('rev-target-enrollment-units');
+
+  if (tokenUnitsContainer) tokenUnitsContainer.innerHTML = '';
+  if (enrollmentUnitsContainer) enrollmentUnitsContainer.innerHTML = '';
+
   const typeSet = new Set([
     ...tokenData.map(r => r.type).filter(Boolean),
     ...fullData.map(r => r.type).filter(Boolean)
@@ -1824,34 +1828,67 @@ function renderRevenue() {
     const fRows = fullData.filter(r => r.type === type);
     const tAgg = revAggTokens(tRows);
     const fAgg = revAggFull(fRows);
-    const achieved = tAgg.amount + fAgg.amount;
     const cohort = findCohortTarget(type);
     const { total: progTarget, perDay: progPerDay } = revScopedTarget([...tRows, ...fRows]);
-    const progPct = progTarget ? Math.min(100, (fAgg.count / progTarget) * 100) : 0;
     const cohortDates = cohort ? `${cohort.startDate} → ${cohort.endDate}` : '';
     const accentClass = idx % 3 === 0 ? 'accent-indigo' : idx % 3 === 1 ? 'accent-emerald' : 'accent-purple';
-    const card = document.createElement('div');
-    card.className = `target-card ${accentClass}`;
-    card.innerHTML = `
-      <div class="target-card-header">
-        <span class="target-card-title">${type}</span>
-        <span class="target-card-sub">Token: ${fCurrency(tAgg.amount)} · Full: ${fCurrency(fAgg.amount)}${cohortDates ? ` · ${cohortDates}` : ''}</span>
-      </div>
-      <div class="target-progress-wrap">
-        ${progTarget ? `
-        <div class="target-progress-bar">
-          <div class="target-progress-fill" style="width: ${progPct.toFixed(1)}%"></div>
-        </div>` : ''}
-        <div class="target-progress-stats">
-          <span>Total: ${fCurrency(achieved)}</span>
-          <span>${revBookingBreakup(tAgg.count, fAgg.count)}${progTarget ? ` · Target: ${formatTargetNum(progTarget)} full (${formatTargetNum(progPerDay)}/day)` : ''}</span>
+
+    // 1. Populate Token target card
+    if (tokenUnitsContainer) {
+      const tokenPct = progTarget ? Math.min(100, (tAgg.count / progTarget) * 100) : 0;
+      const card = document.createElement('div');
+      card.className = `target-card ${accentClass}`;
+      card.innerHTML = `
+        <div class="target-card-header">
+          <span class="target-card-title">${type}</span>
+          <span class="target-card-sub">Tokens Value: ${fCurrency(tAgg.amount)}${cohortDates ? ` · ${cohortDates}` : ''}</span>
         </div>
-      </div>
-    `;
-    targetUnitsContainer.appendChild(card);
+        <div class="target-progress-wrap">
+          ${progTarget ? `
+          <div class="target-progress-bar">
+            <div class="target-progress-fill" style="width: ${tokenPct.toFixed(1)}%"></div>
+          </div>` : ''}
+          <div class="target-progress-stats">
+            <span>Achieved: ${tAgg.count} Tokens</span>
+            <span>Target: ${formatTargetNum(progTarget)} (${formatTargetNum(progPerDay)}/day) · Progress: ${tokenPct.toFixed(1)}%</span>
+          </div>
+        </div>
+      `;
+      tokenUnitsContainer.appendChild(card);
+    }
+
+    // 2. Populate Full Enrollment target card
+    if (enrollmentUnitsContainer) {
+      const fullPct = progTarget ? Math.min(100, (fAgg.count / progTarget) * 100) : 0;
+      const card = document.createElement('div');
+      card.className = `target-card ${accentClass}`;
+      card.innerHTML = `
+        <div class="target-card-header">
+          <span class="target-card-title">${type}</span>
+          <span class="target-card-sub">Enrollments Value: ${fCurrency(fAgg.amount)}${cohortDates ? ` · ${cohortDates}` : ''}</span>
+        </div>
+        <div class="target-progress-wrap">
+          ${progTarget ? `
+          <div class="target-progress-bar">
+            <div class="target-progress-fill" style="width: ${fullPct.toFixed(1)}%"></div>
+          </div>` : ''}
+          <div class="target-progress-stats">
+            <span>Achieved: ${fAgg.count} Full</span>
+            <span>Target: ${formatTargetNum(progTarget)} (${formatTargetNum(progPerDay)}/day) · Progress: ${fullPct.toFixed(1)}%</span>
+          </div>
+        </div>
+      `;
+      enrollmentUnitsContainer.appendChild(card);
+    }
   });
+
   if (types.length === 0) {
-    targetUnitsContainer.innerHTML = '<div class="empty-row" style="grid-column: 1/-1;">No revenue data for selected filters</div>';
+    if (tokenUnitsContainer) {
+      tokenUnitsContainer.innerHTML = '<div class="empty-row" style="grid-column: 1/-1;">No Token revenue data for selected filters</div>';
+    }
+    if (enrollmentUnitsContainer) {
+      enrollmentUnitsContainer.innerHTML = '<div class="empty-row" style="grid-column: 1/-1;">No Full Enrollment revenue data for selected filters</div>';
+    }
   }
 
   setText('rev-lead-tokens', fCurrency(tokenRev));
@@ -1863,15 +1900,15 @@ function renderRevenue() {
   if (prodLoaded) {
     const cData = getBaseProdData();
     totalCalls = cData.reduce((s, r) => s + r.calls, 0);
-    talkMins   = cData.reduce((s, r) => s + r.talkTimeMin, 0);
+    talkMins = cData.reduce((s, r) => s + r.talkTimeMin, 0);
   }
   const activeBdesCount = new Set([
     ...tokenData.map(r => r.bdMail),
     ...fullData.map(r => r.bdMail)
   ].filter(Boolean)).size;
-  setText('rev-input-rev-bde',  fCurrency(activeBdesCount ? Math.round(totalRev / activeBdesCount) : 0));
-  setText('rev-input-rev-dial',  fCurrency(totalCalls ? Math.round(totalRev / totalCalls) : 0));
-  setText('rev-input-rev-talk',  fCurrency(talkMins ? Math.round(totalRev / talkMins) : 0));
+  setText('rev-input-rev-bde', fCurrency(activeBdesCount ? Math.round(totalRev / activeBdesCount) : 0));
+  setText('rev-input-rev-dial', fCurrency(totalCalls ? Math.round(totalRev / totalCalls) : 0));
+  setText('rev-input-rev-talk', fCurrency(talkMins ? Math.round(totalRev / talkMins) : 0));
 
   // Top 3 BDAs by token count
   const bdaPodiumContainer = document.getElementById('rev-podium-bdas');
@@ -1918,7 +1955,7 @@ function renderRevenue() {
   gmNames.forEach(gmName => {
     const gmRows = [...tokenData, ...fullData].filter(r => r.gm === gmName);
     const gmTokens = revAggTokens(tokenData.filter(r => r.gm === gmName));
-    const gmFull   = revAggFull(fullData.filter(r => r.gm === gmName));
+    const gmFull = revAggFull(fullData.filter(r => r.gm === gmName));
     const { total: gmTarget, perDay: gmTargetDay } = revRowsCohortTarget(gmRows, gmName);
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1938,7 +1975,7 @@ function renderRevenue() {
   tlNames.forEach(tlName => {
     const tlRows = [...tokenData, ...fullData].filter(r => normTeamName(r.tl) === normTeamName(tlName));
     const tlTokens = revAggTokens(tokenData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
-    const tlFull   = revAggFull(fullData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
+    const tlFull = revAggFull(fullData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
     if (tlTokens.count === 0 && tlFull.count === 0) return;
     const { total: tlTarget, perDay: tlTargetDay } = revTlRowsCohortTarget(tlName);
     const tr = document.createElement('tr');
@@ -2015,7 +2052,7 @@ function renderRevenue() {
       const formattedDate = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', {
         day: '2-digit', month: 'short', year: 'numeric'
       });
-      const tokenDisplay  = fNum(info.tokens);
+      const tokenDisplay = fNum(info.tokens);
       const enrollDisplay = fNum(info.enrolls);
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -2034,14 +2071,14 @@ function renderRevenue() {
 // ==========================================
 function mapProdRow(obj) {
   return {
-    owner:     obj['Owner Name'] || '',
-    date:      (obj['Date'] || '').substring(0, 10),
-    calls:       parseNum(obj['# Calls']),
-    connected:   parseNum(obj['# Calls Connected']),
+    owner: obj['Owner Name'] || '',
+    date: (obj['Date'] || '').substring(0, 10),
+    calls: parseNum(obj['# Calls']),
+    connected: parseNum(obj['# Calls Connected']),
     uniqueLeads: parseNum(obj['# Unique Leads']),
     talkTimeMin: parseNum(obj['Total Call Duration']),
-    manager:   (obj['Manager Name'] || '').trim(),
-    gm:        (obj['GM Name'] || '').trim(),
+    manager: (obj['Manager Name'] || '').trim(),
+    gm: (obj['GM Name'] || '').trim(),
   };
 }
 
@@ -2062,8 +2099,8 @@ function getProdOwnersForProgram() {
 function getProdGlobalData() {
   return prodAllRows.filter(r => {
     const inDate = (!activeFilters.dateFrom || r.date >= activeFilters.dateFrom) &&
-                   (!activeFilters.dateTo   || r.date <= activeFilters.dateTo);
-    const inGM   = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
+      (!activeFilters.dateTo || r.date <= activeFilters.dateTo);
+    const inGM = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
     return inDate && inGM && r.owner;
   });
 }
@@ -2072,7 +2109,7 @@ function getBaseProdData() {
   let pool = getProdGlobalData();
   const programOwners = getProdOwnersForProgram();
   if (programOwners) pool = pool.filter(r => programOwners.has(r.owner));
-  if (activeFilters.tl !== 'ALL')  pool = pool.filter(r => r.manager === activeFilters.tl);
+  if (activeFilters.tl !== 'ALL') pool = pool.filter(r => r.manager === activeFilters.tl);
   if (activeFilters.bde !== 'ALL') pool = pool.filter(r => r.owner === activeFilters.bde);
   return pool;
 }
@@ -2092,7 +2129,7 @@ function populateProdGlobalFilters() {
       opt.textContent = name;
       gmSel.appendChild(opt);
     });
-    
+
     const allowed = getAllowedGMs();
     if (allowed.length === 1) {
       activeFilters.gm = allowed[0];
@@ -2102,7 +2139,7 @@ function populateProdGlobalFilters() {
       activeFilters.gm = current;
     }
     gmSel.value = activeFilters.gm;
-    
+
     const gmFilterGroup = document.getElementById('gm-filter-group');
     if (gmFilterGroup) {
       gmFilterGroup.style.display = allowed.length <= 1 ? 'none' : 'flex';
@@ -2190,11 +2227,11 @@ async function fetchProductivityCSV() {
         const dates = prodAllRows.map(r => r.date).filter(Boolean).sort();
         if (dates.length) {
           activeFilters.dateFrom = dates[0];
-          activeFilters.dateTo   = dates[dates.length - 1];
+          activeFilters.dateTo = dates[dates.length - 1];
           const dateFromEl = document.getElementById('date-from');
-          const dateToEl   = document.getElementById('date-to');
+          const dateToEl = document.getElementById('date-to');
           if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
-          if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+          if (dateToEl) dateToEl.value = activeFilters.dateTo;
 
           const filterDateEl = document.getElementById('filter-date');
           if (filterDateEl) filterDateEl.value = 'custom';
@@ -2275,8 +2312,8 @@ function renderProductivity() {
   const { calls: totalCalls, connects: connected, talk: talkMins, activeBdes: activeBDEs } = prodAggregate(cData);
 
   const connectRate = totalCalls ? ((connected / totalCalls) * 100).toFixed(1) : 0;
-  const talkHrs     = (talkMins / 60).toFixed(1);
-  const avgTalkSec  = connected ? Math.round((talkMins * 60) / connected) : 0;
+  const talkHrs = (talkMins / 60).toFixed(1);
+  const avgTalkSec = connected ? Math.round((talkMins * 60) / connected) : 0;
 
   const allOwnersInScope = new Set(getProdGlobalData().map(r => r.owner));
   const programOwners = getProdOwnersForProgram();
@@ -2284,14 +2321,14 @@ function renderProductivity() {
     ? [...programOwners].filter(o => allOwnersInScope.has(o)).length
     : allOwnersInScope.size;
 
-  setText('prod-calls',       fNum(totalCalls));
-  setText('prod-calls-sub',   `${fNum(connected)} connected`);
-  setText('prod-connect',     `${connectRate}%`);
+  setText('prod-calls', fNum(totalCalls));
+  setText('prod-calls-sub', `${fNum(connected)} connected`);
+  setText('prod-connect', `${connectRate}%`);
   setText('prod-connect-sub', `${fNum(connected)} connected calls`);
-  setText('prod-talk',        `${talkHrs}h`);
-  setText('prod-talk-sub',    `Avg ${avgTalkSec}s per connect`);
-  setText('prod-active',      `${activeBDEs}/${totalBDEs || activeBDEs}`);
-  setText('prod-active-sub',  `active in period`);
+  setText('prod-talk', `${talkHrs}h`);
+  setText('prod-talk-sub', `Avg ${avgTalkSec}s per connect`);
+  setText('prod-active', `${activeBDEs}/${totalBDEs || activeBDEs}`);
+  setText('prod-active-sub', `active in period`);
 
   // Top 3 BDAs by Total Talk Time (TT)
   const bdaPodiumContainer = document.getElementById('prod-podium-bdas');
@@ -2342,8 +2379,8 @@ function renderProductivity() {
     if (gmRows.length === 0) return;
     const { calls: gmDials, connects: gmConnects, uniqueDialled: gmUnique, talk: gmTalk } = prodAggregate(gmRows);
     const gmAvgCall = prodAvgCall(gmRows);
-    const gmAvgCC   = prodAvgCC(gmRows);
-    const gmAvgTT   = prodAvgTT(gmRows);
+    const gmAvgCC = prodAvgCC(gmRows);
+    const gmAvgTT = prodAvgTT(gmRows);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2375,8 +2412,8 @@ function renderProductivity() {
     const tlRows = tlMap[tlName];
     const { calls: tlDials, connects: tlConnects, uniqueDialled: tlUnique, talk: tlTalk } = prodAggregate(tlRows);
     const tlAvgCall = prodAvgCall(tlRows);
-    const tlAvgCC   = prodAvgCC(tlRows);
-    const tlAvgTT   = prodAvgTT(tlRows);
+    const tlAvgCC = prodAvgCC(tlRows);
+    const tlAvgTT = prodAvgTT(tlRows);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2402,8 +2439,8 @@ function renderProductivity() {
     const bdeRows = bdeMap[owner];
     const { calls: dials, connects, uniqueDialled, talk } = prodAggregate(bdeRows);
     const bdeAvgCall = prodAvgCall(bdeRows);
-    const bdeAvgCC   = prodAvgCC(bdeRows);
-    const bdeAvgTT   = prodAvgTT(bdeRows);
+    const bdeAvgCC = prodAvgCC(bdeRows);
+    const bdeAvgTT = prodAvgTT(bdeRows);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2643,18 +2680,18 @@ function renderLeads() {
     }
   }
 
-  const total      = lData.length;
+  const total = lData.length;
   const interested = lrCountInterested(lData);
-  const followup   = lrCountFollowUp(lData);
-  const enrolled   = lrCountEnrolled(lData);
-  const convRate   = lrConvPct(enrolled, total);
+  const followup = lrCountFollowUp(lData);
+  const enrolled = lrCountEnrolled(lData);
+  const convRate = lrConvPct(enrolled, total);
 
-  setText('lead-total',          fNum(total));
-  setText('lead-interested',     fNum(interested));
+  setText('lead-total', fNum(total));
+  setText('lead-interested', fNum(interested));
   setText('lead-interested-sub', `${total ? ((interested / total) * 100).toFixed(0) : 0}% of total`);
-  setText('lead-followup',       fNum(followup));
-  setText('lead-enrolled',       fNum(enrolled));
-  setText('lead-enrolled-sub',   `${convRate}% conversion`);
+  setText('lead-followup', fNum(followup));
+  setText('lead-enrolled', fNum(enrolled));
+  setText('lead-enrolled-sub', `${convRate}% conversion`);
 
   destroyChart('leadStage');
   destroyChart('leadSource');
@@ -2762,8 +2799,8 @@ function renderLeads() {
     if (gmLeads.length === 0) return;
     const gmTotal = gmLeads.length;
     const gmStages = lrCountStages(gmLeads);
-    const gmTok   = lrCountTokens(gmLeads);
-    const gmEnr   = lrCountEnrolled(gmLeads);
+    const gmTok = lrCountTokens(gmLeads);
+    const gmEnr = lrCountEnrolled(gmLeads);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2793,8 +2830,8 @@ function renderLeads() {
     const program = lrDominantProgram(tlLeads);
     const tlTotal = tlLeads.length;
     const tlStages = lrCountStages(tlLeads);
-    const tlTok   = lrCountTokens(tlLeads);
-    const tlEnr   = lrCountEnrolled(tlLeads);
+    const tlTok = lrCountTokens(tlLeads);
+    const tlEnr = lrCountEnrolled(tlLeads);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2825,8 +2862,8 @@ function renderLeads() {
     .forEach(({ owner, tl, rows: bdeLeads }) => {
       const bTotal = bdeLeads.length;
       const bStages = lrCountStages(bdeLeads);
-      const bTok   = lrCountTokens(bdeLeads);
-      const bEnr   = lrCountEnrolled(bdeLeads);
+      const bTok = lrCountTokens(bdeLeads);
+      const bEnr = lrCountEnrolled(bdeLeads);
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -2901,19 +2938,19 @@ function parseCSV(text) {
 
 function mapCSVRow(obj) {
   return {
-    email:          obj['Email Address'] || '',
-    source:         obj['Lead Source'] || '',
-    subSource:      obj['Sub Source'] || '',
-    createdOn:      (obj['Created On'] || '').substring(0, 10),
-    program:        obj['Program'] || '',
-    owner:          obj['Owner (User Email)'] || '',
-    status:         obj['Status'] || '',
-    stage:          obj['Stage'] || '',
-    campaign:       obj['Campaign'] || '',
-    tl:             (obj['TL Name '] || obj['TL Name'] || '').trim(),
-    gm:             (obj['GM NAME'] || '').trim(),
-    finalStage:     obj['Final Stage'] || '',
-    tokenDate:      obj['Token Date'] || '',
+    email: obj['Email Address'] || '',
+    source: obj['Lead Source'] || '',
+    subSource: obj['Sub Source'] || '',
+    createdOn: (obj['Created On'] || '').substring(0, 10),
+    program: obj['Program'] || '',
+    owner: obj['Owner (User Email)'] || '',
+    status: obj['Status'] || '',
+    stage: obj['Stage'] || '',
+    campaign: obj['Campaign'] || '',
+    tl: (obj['TL Name '] || obj['TL Name'] || '').trim(),
+    gm: (obj['GM NAME'] || '').trim(),
+    finalStage: obj['Final Stage'] || '',
+    tokenDate: obj['Token Date'] || '',
     enrollmentDate: obj['Enrollment Date'] || '',
   };
 }
@@ -2933,7 +2970,7 @@ async function fetchLeadCSV() {
     const text = await resp.text();
     const raw = parseCSV(text);
     laAllRows = raw.map(mapCSVRow).filter(r => r.email || r.createdOn);
-    laLoaded  = true;
+    laLoaded = true;
     allowedGMsCache = null;
 
     if (CSV_LEAD_VIEWS.includes(activeView)) {
@@ -2941,11 +2978,11 @@ async function fetchLeadCSV() {
         const dates = laAllRows.map(r => r.createdOn).filter(Boolean).sort();
         if (dates.length) {
           activeFilters.dateFrom = dates[0];
-          activeFilters.dateTo   = dates[dates.length - 1];
+          activeFilters.dateTo = dates[dates.length - 1];
           const dateFromEl = document.getElementById('date-from');
-          const dateToEl   = document.getElementById('date-to');
+          const dateToEl = document.getElementById('date-to');
           if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
-          if (dateToEl)   dateToEl.value   = activeFilters.dateTo;
+          if (dateToEl) dateToEl.value = activeFilters.dateTo;
 
           const filterDateEl = document.getElementById('filter-date');
           if (filterDateEl) filterDateEl.value = 'custom';
@@ -2975,8 +3012,8 @@ async function fetchLeadCSV() {
 function populateLAGlobalFilters() {
   const gmSel = document.getElementById('filter-gm');
   if (gmSel) {
-    const current  = activeFilters.gm;
-    const gmNames  = [...new Set(laAllRows.map(r => r.gm).filter(Boolean))].filter(g => isGMAllowed(g)).sort();
+    const current = activeFilters.gm;
+    const gmNames = [...new Set(laAllRows.map(r => r.gm).filter(Boolean))].filter(g => isGMAllowed(g)).sort();
     gmSel.innerHTML = '';
     if (gmNames.length > 1) {
       gmSel.innerHTML = '<option value="ALL">All GMs</option>';
@@ -2987,7 +3024,7 @@ function populateLAGlobalFilters() {
       opt.textContent = name;
       gmSel.appendChild(opt);
     });
-    
+
     const allowed = getAllowedGMs();
     if (allowed.length === 1) {
       activeFilters.gm = allowed[0];
@@ -2997,7 +3034,7 @@ function populateLAGlobalFilters() {
       activeFilters.gm = current;
     }
     gmSel.value = activeFilters.gm;
-    
+
     const gmFilterGroup = document.getElementById('gm-filter-group');
     if (gmFilterGroup) {
       gmFilterGroup.style.display = allowed.length <= 1 ? 'none' : 'flex';
@@ -3029,7 +3066,7 @@ function populateLATLs() {
   const sel = document.getElementById('filter-tl');
   if (!sel) return;
   let pool = laAllRows;
-  if (activeFilters.gm !== 'ALL')      pool = pool.filter(r => r.gm === activeFilters.gm);
+  if (activeFilters.gm !== 'ALL') pool = pool.filter(r => r.gm === activeFilters.gm);
   if (activeFilters.program !== 'ALL') pool = pool.filter(r => r.program === activeFilters.program);
   const tls = [...new Set(pool.map(r => r.tl).filter(Boolean))].sort();
   sel.innerHTML = '<option value="ALL">All TLs</option>';
@@ -3047,9 +3084,9 @@ function populateLABDEs(tlName) {
   const sel = document.getElementById('filter-bde');
   if (!sel) return;
   let pool = laAllRows;
-  if (activeFilters.gm !== 'ALL')      pool = pool.filter(r => r.gm === activeFilters.gm);
+  if (activeFilters.gm !== 'ALL') pool = pool.filter(r => r.gm === activeFilters.gm);
   if (activeFilters.program !== 'ALL') pool = pool.filter(r => r.program === activeFilters.program);
-  if (tlName && tlName !== 'ALL')      pool = pool.filter(r => r.tl === tlName);
+  if (tlName && tlName !== 'ALL') pool = pool.filter(r => r.tl === tlName);
   const bdes = [...new Set(pool.map(r => r.owner).filter(Boolean))].sort();
   sel.innerHTML = '<option value="ALL">All BDEs</option>';
   bdes.forEach(b => {
@@ -3065,9 +3102,9 @@ function populateLABDEs(tlName) {
 // Global filters: GM, Program, Date (used for T1 dropdown options)
 function getLAGlobalData() {
   return laAllRows.filter(r => {
-    const inDate    = (!activeFilters.dateFrom || r.createdOn >= activeFilters.dateFrom) &&
-                      (!activeFilters.dateTo   || r.createdOn <= activeFilters.dateTo);
-    const inGM      = activeFilters.gm      === 'ALL' ? isGMAllowed(r.gm) : r.gm      === activeFilters.gm;
+    const inDate = (!activeFilters.dateFrom || r.createdOn >= activeFilters.dateFrom) &&
+      (!activeFilters.dateTo || r.createdOn <= activeFilters.dateTo);
+    const inGM = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
     const inProgram = activeFilters.program === 'ALL' || r.program === activeFilters.program;
     return inDate && inGM && inProgram;
   });
@@ -3076,7 +3113,7 @@ function getLAGlobalData() {
 // --- Base data filtered by all global filters ---
 function getBaseLAData() {
   return getLAGlobalData().filter(r => {
-    const inTL  = activeFilters.tl  === 'ALL' || r.tl    === activeFilters.tl;
+    const inTL = activeFilters.tl === 'ALL' || r.tl === activeFilters.tl;
     const inBDE = activeFilters.bde === 'ALL' || r.owner === activeFilters.bde;
     return inTL && inBDE;
   });
@@ -3087,6 +3124,15 @@ function renderLeadAnalysis() {
   if (!laLoaded) {
     fetchLeadCSV();
     return;
+  }
+
+  const campaignCard = document.getElementById('la-campaign-table-card');
+  if (campaignCard) {
+    if (currentUser === 'syed') {
+      campaignCard.style.display = 'block';
+    } else {
+      campaignCard.style.display = 'none';
+    }
   }
 
   // Dynamically update the thead headers to guarantee they match the columns, solving caching issues
@@ -3152,13 +3198,13 @@ function renderLeadAnalysis() {
   populateTableCampaignDropdown('t3-filter-campaign', base);
 
   // KPI strip
-  const totalLeads    = base.length;
-  const totalTokens   = base.filter(r => isNonBlank(r.tokenDate)).length;
+  const totalLeads = base.length;
+  const totalTokens = base.filter(r => isNonBlank(r.tokenDate)).length;
   const totalEnrolled = base.filter(r => isNonBlank(r.enrollmentDate)).length;
-  setText('la-kpi-leads',    fNum(totalLeads));
-  setText('la-kpi-tokens',   fNum(totalTokens));
+  setText('la-kpi-leads', fNum(totalLeads));
+  setText('la-kpi-tokens', fNum(totalTokens));
   setText('la-kpi-enrolled', fNum(totalEnrolled));
-  setText('la-kpi-cvr',      totalLeads ? ((totalEnrolled / totalLeads) * 100).toFixed(2) + '%' : '0.00%');
+  setText('la-kpi-cvr', totalLeads ? ((totalEnrolled / totalLeads) * 100).toFixed(2) + '%' : '0.00%');
 
   renderTable1();
   renderTable2();
@@ -3167,7 +3213,7 @@ function renderLeadAnalysis() {
 
 // --- Table-level dropdown helpers (use live base pool) ---
 function populateTableTLAndBDE(tlSelId, bdeSelId, basePool) {
-  const tlSel  = document.getElementById(tlSelId);
+  const tlSel = document.getElementById(tlSelId);
   const bdeSel = document.getElementById(bdeSelId);
   if (!tlSel || !bdeSel) return;
 
@@ -3229,7 +3275,7 @@ function populateTableCampaignDropdown(selId, basePool) {
 
 // --- Table 1: Date-wise (Created On) ---
 function populateT1Dropdowns() {
-  const tlSel  = document.getElementById('t1-filter-tl');
+  const tlSel = document.getElementById('t1-filter-tl');
   const bdeSel = document.getElementById('t1-filter-bde');
   if (!tlSel || !bdeSel) return;
 
@@ -3263,7 +3309,7 @@ function populateT1Dropdowns() {
 }
 
 function onT1TLChange() {
-  const tlSel  = document.getElementById('t1-filter-tl');
+  const tlSel = document.getElementById('t1-filter-tl');
   const bdeSel = document.getElementById('t1-filter-bde');
   if (tlSel && bdeSel) {
     const pool = getLAGlobalData().filter(r => tlSel.value === 'ALL' || r.tl === tlSel.value);
@@ -3281,12 +3327,12 @@ function onT1TLChange() {
 }
 
 function renderTable1() {
-  const tlVal  = document.getElementById('t1-filter-tl')?.value  || 'ALL';
+  const tlVal = document.getElementById('t1-filter-tl')?.value || 'ALL';
   const bdeVal = document.getElementById('t1-filter-bde')?.value || 'ALL';
 
   // Start from global GM/Program/Date/TL/BDE filters, then apply T1 TL + BDE
   const pool = getBaseLAData().filter(r =>
-    (tlVal  === 'ALL' || r.tl    === tlVal) &&
+    (tlVal === 'ALL' || r.tl === tlVal) &&
     (bdeVal === 'ALL' || r.owner === bdeVal)
   );
 
@@ -3300,7 +3346,7 @@ function renderTable1() {
     const dateKey = r.createdOn || '(unknown)';
     if (!map[dateKey]) map[dateKey] = { leads: 0, tokens: 0, enrolled: 0 };
     map[dateKey].leads++;
-    if (isNonBlank(r.tokenDate))      map[dateKey].tokens++;
+    if (isNonBlank(r.tokenDate)) map[dateKey].tokens++;
     if (isNonBlank(r.enrollmentDate)) map[dateKey].enrolled++;
   });
 
@@ -3329,9 +3375,9 @@ function renderTable1() {
 }
 
 function resetT1() {
-  const tlSel  = document.getElementById('t1-filter-tl');
+  const tlSel = document.getElementById('t1-filter-tl');
   const bdeSel = document.getElementById('t1-filter-bde');
-  if (tlSel)  tlSel.value  = 'ALL';
+  if (tlSel) tlSel.value = 'ALL';
   if (bdeSel) bdeSel.value = 'ALL';
   populateT1Dropdowns();
   renderTable1();
@@ -3339,7 +3385,7 @@ function resetT1() {
 
 // --- Table 2: Source-wise ---
 function onT2TLChange() {
-  const tlSel  = document.getElementById('t2-filter-tl');
+  const tlSel = document.getElementById('t2-filter-tl');
   const bdeSel = document.getElementById('t2-filter-bde');
   if (tlSel && bdeSel) {
     const pool = getBaseLAData().filter(r => tlSel.value === 'ALL' || r.tl === tlSel.value);
@@ -3357,24 +3403,24 @@ function onT2TLChange() {
 }
 
 function renderTable2() {
-  const base   = getBaseLAData();
+  const base = getBaseLAData();
   const srcVal = document.getElementById('t2-filter-source')?.value || 'ALL';
-  const tlVal  = document.getElementById('t2-filter-tl')?.value    || 'ALL';
-  const bdeVal = document.getElementById('t2-filter-bde')?.value   || 'ALL';
-  const pool   = base.filter(r =>
+  const tlVal = document.getElementById('t2-filter-tl')?.value || 'ALL';
+  const bdeVal = document.getElementById('t2-filter-bde')?.value || 'ALL';
+  const pool = base.filter(r =>
     (srcVal === 'ALL' || r.subSource === srcVal) &&
-    (tlVal  === 'ALL' || r.tl        === tlVal)  &&
-    (bdeVal === 'ALL' || r.owner     === bdeVal)
+    (tlVal === 'ALL' || r.tl === tlVal) &&
+    (bdeVal === 'ALL' || r.owner === bdeVal)
   );
   renderLATable('la-table2-body', pool, 'date');
 }
 
 function resetT2() {
   const srcSel = document.getElementById('t2-filter-source');
-  const tlSel  = document.getElementById('t2-filter-tl');
+  const tlSel = document.getElementById('t2-filter-tl');
   const bdeSel = document.getElementById('t2-filter-bde');
   if (srcSel) srcSel.value = 'ALL';
-  if (tlSel)  tlSel.value  = 'ALL';
+  if (tlSel) tlSel.value = 'ALL';
   if (bdeSel) bdeSel.value = 'ALL';
   const base = getBaseLAData();
   populateTableSourceDropdown('t2-filter-source', base, 'subSource');
@@ -3384,7 +3430,7 @@ function resetT2() {
 
 // --- Table 3: Campaign-wise ---
 function onT3TLChange() {
-  const tlSel  = document.getElementById('t3-filter-tl');
+  const tlSel = document.getElementById('t3-filter-tl');
   const bdeSel = document.getElementById('t3-filter-bde');
   if (tlSel && bdeSel) {
     const pool = getBaseLAData().filter(r => tlSel.value === 'ALL' || r.tl === tlSel.value);
@@ -3402,16 +3448,16 @@ function onT3TLChange() {
 }
 
 function renderTable3() {
-  const base   = getBaseLAData();
+  const base = getBaseLAData();
   const cmpVal = document.getElementById('t3-filter-campaign')?.value || 'ALL';
-  const srcVal = document.getElementById('t3-filter-source')?.value   || 'ALL';
-  const tlVal  = document.getElementById('t3-filter-tl')?.value       || 'ALL';
-  const bdeVal = document.getElementById('t3-filter-bde')?.value      || 'ALL';
-  const pool   = base.filter(r =>
+  const srcVal = document.getElementById('t3-filter-source')?.value || 'ALL';
+  const tlVal = document.getElementById('t3-filter-tl')?.value || 'ALL';
+  const bdeVal = document.getElementById('t3-filter-bde')?.value || 'ALL';
+  const pool = base.filter(r =>
     (cmpVal === 'ALL' || r.campaign === cmpVal) &&
-    (srcVal === 'ALL' || r.source   === srcVal) &&
-    (tlVal  === 'ALL' || r.tl       === tlVal)  &&
-    (bdeVal === 'ALL' || r.owner    === bdeVal)
+    (srcVal === 'ALL' || r.source === srcVal) &&
+    (tlVal === 'ALL' || r.tl === tlVal) &&
+    (bdeVal === 'ALL' || r.owner === bdeVal)
   );
   renderLATable('la-table3-body', pool, 'date');
 }
@@ -3419,11 +3465,11 @@ function renderTable3() {
 function resetT3() {
   const cmpSel = document.getElementById('t3-filter-campaign');
   const srcSel = document.getElementById('t3-filter-source');
-  const tlSel  = document.getElementById('t3-filter-tl');
+  const tlSel = document.getElementById('t3-filter-tl');
   const bdeSel = document.getElementById('t3-filter-bde');
   if (cmpSel) cmpSel.value = 'ALL';
   if (srcSel) srcSel.value = 'ALL';
-  if (tlSel)  tlSel.value  = 'ALL';
+  if (tlSel) tlSel.value = 'ALL';
   if (bdeSel) bdeSel.value = 'ALL';
   const base = getBaseLAData();
   populateTableCampaignDropdown('t3-filter-campaign', base);
@@ -3442,14 +3488,14 @@ function renderLATable(tbodyId, pool, groupBy) {
   const map = {};
   pool.forEach(r => {
     let key;
-    if      (groupBy === 'source')    key = r.source    || '(unknown)';
+    if (groupBy === 'source') key = r.source || '(unknown)';
     else if (groupBy === 'subSource') key = r.subSource || '(unknown)';
-    else if (groupBy === 'campaign')  key = r.campaign  || '(unknown)';
-    else                               key = r.createdOn || '(unknown)';
+    else if (groupBy === 'campaign') key = r.campaign || '(unknown)';
+    else key = r.createdOn || '(unknown)';
 
     if (!map[key]) map[key] = { leads: 0, tokens: 0, enrolled: 0 };
     map[key].leads++;
-    if (isNonBlank(r.tokenDate))      map[key].tokens++;
+    if (isNonBlank(r.tokenDate)) map[key].tokens++;
     if (isNonBlank(r.enrollmentDate)) map[key].enrolled++;
   });
 
@@ -3628,20 +3674,20 @@ function applyDatePreset(opt) {
 function showCustomDatePopup() {
   const popup = document.getElementById('custom-date-popup');
   if (!popup) return;
-  
+
   // Pre-populate with currently active filters
   const dateFromEl = document.getElementById('date-from');
   const dateToEl = document.getElementById('date-to');
   if (dateFromEl) dateFromEl.value = activeFilters.dateFrom;
   if (dateToEl) dateToEl.value = activeFilters.dateTo;
-  
+
   popup.style.display = 'block';
 }
 
 function closeCustomDatePopup(apply) {
   const popup = document.getElementById('custom-date-popup');
   if (!popup) return;
-  
+
   if (apply) {
     const fromVal = document.getElementById('date-from').value;
     const toVal = document.getElementById('date-to').value;
@@ -3659,14 +3705,14 @@ function closeCustomDatePopup(apply) {
     const filterDateEl = document.getElementById('filter-date');
     if (filterDateEl) filterDateEl.value = lastAppliedDateOption;
   }
-  
+
   popup.style.display = 'none';
 }
 
 function updateDateDisplayLabel() {
   const label = document.getElementById('date-display-label');
   if (!label) return;
-  
+
   const from = activeFilters.dateFrom;
   const to = activeFilters.dateTo;
   if (from && to) {

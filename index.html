@@ -583,54 +583,23 @@
 
           </div>
 
-          <!-- Target (Unit wise) -->
+          <!-- Target Token (Unit wise) -->
           <div class="card">
             <div class="card-header">
-              <h2 class="card-title">Target (Unit wise)</h2>
+              <h2 class="card-title">Target Token (Unit wise)</h2>
             </div>
-            <div class="target-grid" id="rev-target-units">
+            <div class="target-grid" id="rev-target-token-units">
               <!-- JS populated -->
             </div>
           </div>
 
-          <!-- Lead & Input Split Grid -->
-          <div class="two-col-grid">
-            <!-- Lead Revenue Metrics -->
-            <div class="card accent-indigo">
-              <div class="card-header">
-                <h2 class="card-title">Lead Revenue Metrics</h2>
-              </div>
-              <div class="metrics-box-grid">
-                <div class="sub-metric-card">
-                  <div class="sub-metric-val" id="rev-lead-tokens">₹0</div>
-                  <div class="sub-metric-lbl">Token Rev</div>
-                </div>
-                <div class="sub-metric-card">
-                  <div class="sub-metric-val" id="rev-lead-enrollments">₹0</div>
-                  <div class="sub-metric-lbl">Enrollment Rev</div>
-                </div>
-              </div>
+          <!-- Target Full Enrollment (Unit wise) -->
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Target Full Enrollment (Unit wise)</h2>
             </div>
-
-            <!-- Input Efficiency Metrics -->
-            <div class="card accent-emerald">
-              <div class="card-header">
-                <h2 class="card-title">Input Efficiency</h2>
-              </div>
-              <div class="metrics-box-grid">
-                <div class="sub-metric-card">
-                  <div class="sub-metric-val" id="rev-input-rev-bde">₹0</div>
-                  <div class="sub-metric-lbl">Rev / BDE</div>
-                </div>
-                <div class="sub-metric-card">
-                  <div class="sub-metric-val" id="rev-input-rev-dial">₹0</div>
-                  <div class="sub-metric-lbl">Rev / Dial</div>
-                </div>
-                <div class="sub-metric-card">
-                  <div class="sub-metric-val" id="rev-input-rev-talk">₹0</div>
-                  <div class="sub-metric-lbl">Rev / Talk Min</div>
-                </div>
-              </div>
+            <div class="target-grid" id="rev-target-enrollment-units">
+              <!-- JS populated -->
             </div>
           </div>
 
@@ -1277,7 +1246,7 @@
           </div>
 
           <!-- ── TABLE 3: Campaign + Source + TL + BDE ── -->
-          <div class="card la-table-card accent-purple">
+          <div class="card la-table-card accent-purple" id="la-campaign-table-card">
             <div class="card-header la-table-header">
               <div class="la-table-title-wrap">
                 <span class="la-table-badge la-badge-t3">T3</span>
@@ -1288,15 +1257,15 @@
             <!-- Table 3 Filters: Campaign + Source + TL + BDE -->
             <div class="la-inline-filters la-filters-t3">
               <div class="la-filter-group">
-                <label class="la-filter-lbl">Campaign</label>
-                <select class="la-select" id="t3-filter-campaign" onchange="renderTable3()">
-                  <option value="ALL">All Campaigns</option>
-                </select>
-              </div>
-              <div class="la-filter-group">
                 <label class="la-filter-lbl">Source</label>
                 <select class="la-select" id="t3-filter-source" onchange="renderTable3()">
                   <option value="ALL">All Sources</option>
+                </select>
+              </div>
+              <div class="la-filter-group">
+                <label class="la-filter-lbl">Campaign</label>
+                <select class="la-select" id="t3-filter-campaign" onchange="renderTable3()">
+                  <option value="ALL">All Campaigns</option>
                 </select>
               </div>
               <div class="la-filter-group">
