@@ -2193,7 +2193,9 @@ function renderRevenue() {
     const tAgg = revAggTokens(tRows);
     const fAgg = revAggFull(fRows);
     const cohort = findCohortTarget(type);
-    const { total: progTarget, perDay: progPerDay } = revScopedTarget([...tRows, ...fRows]);
+    const { total: rawProgTarget, perDay: rawProgPerDay } = revScopedTarget([...tRows, ...fRows]);
+    const progTarget = Math.ceil(rawProgTarget);
+    const progPerDay = Math.ceil(rawProgPerDay);
     const cohortDates = cohort ? `${cohort.startDate} → ${cohort.endDate}` : '';
     const accentClass = idx % 3 === 0 ? 'accent-indigo' : idx % 3 === 1 ? 'accent-emerald' : 'accent-purple';
 
@@ -2356,8 +2358,10 @@ function renderRevenue() {
       const gmName = gmDisplayName[key] || key;
       const gmTokens = revAggTokens(gmMap[key].tokens);
       const gmFull = revAggFull(gmMap[key].full);
-      const { total: gmTarget, perDay: gmTargetDay } = revGmSheetTarget(gmName);
-      const { deficit: gmDeficit } = revGmCurrentDeficit(gmName);
+      const { total: rawGmTarget, perDay: gmTargetDay } = revGmSheetTarget(gmName);
+      const gmTarget = Math.ceil(rawGmTarget);
+      const { deficit: rawGmDeficit } = revGmCurrentDeficit(gmName);
+      const gmDeficit = Math.ceil(rawGmDeficit);
       const tr = document.createElement('tr');
       tr.innerHTML = `
       <td class="col-name bold">${gmName}</td>
@@ -2433,8 +2437,10 @@ function renderRevenue() {
       const tlName = tlDisplayName[key] || key;
       const tlTokens = revAggTokens(tlMap[key].tokens);
       const tlFull = revAggFull(tlMap[key].full);
-      const { total: tlTarget, perDay: tlTargetDay } = revTlSheetTarget(tlName);
-      const { deficit: tlDeficit } = revTlCurrentDeficit(tlName);
+      const { total: rawTlTarget, perDay: tlTargetDay } = revTlSheetTarget(tlName);
+      const tlTarget = Math.ceil(rawTlTarget);
+      const { deficit: rawTlDeficit } = revTlCurrentDeficit(tlName);
+      const tlDeficit = Math.ceil(rawTlDeficit);
       const tr = document.createElement('tr');
       tr.innerHTML = `
       <td class="col-name bold">${tlName}</td>
@@ -2494,8 +2500,10 @@ function renderRevenue() {
     const bd = bdeDisplayEmail[key] || key;
     const tAgg = revAggTokens(bdeMap[key].tokens);
     const fAgg = revAggFull(bdeMap[key].full);
-    const { total: bdeTarget, perDay: bdeTargetDay } = revBdSheetTarget(bd);
-    const { deficit: bdeDeficit } = revBdCurrentDeficit(bd);
+    const { total: rawBdeTarget, perDay: bdeTargetDay } = revBdSheetTarget(bd);
+    const bdeTarget = Math.ceil(rawBdeTarget);
+    const { deficit: rawBdeDeficit } = revBdCurrentDeficit(bd);
+    const bdeDeficit = Math.ceil(rawBdeDeficit);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-name bold" title="${bd}">${bd}</td>
