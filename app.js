@@ -214,6 +214,17 @@ let cohortLoaded = false;
 let tlTargetRows = [];
 let tlTargetLoaded = false;
 
+function updateLoadingOverlay() {
+  const overlay = document.getElementById('loading-overlay');
+  if (!overlay) return;
+  const isUserLoggedIn = (typeof currentUser !== 'undefined' && currentUser !== null && currentUser !== '');
+  if (isUserLoggedIn && (prodLoading || revLoading || laLoading)) {
+    overlay.classList.remove('hidden');
+  } else {
+    overlay.classList.add('hidden');
+  }
+}
+
 function isNonBlank(val) {
   return val != null && String(val).trim() !== '';
 }
@@ -563,6 +574,8 @@ function showLoginScreen() {
   document.getElementById('app-layout').style.display = 'none';
   const overlay = document.getElementById('login-overlay');
   if (overlay) overlay.style.display = 'flex';
+  const loadingOverlay = document.getElementById('loading-overlay');
+  if (loadingOverlay) loadingOverlay.classList.add('hidden');
 }
 
 function handleLogin() {
@@ -2053,6 +2066,7 @@ async function ensureInputMappingLoaded() {
 async function fetchRevenueCSV() {
   if (revLoading) return;
   revLoading = true;
+  updateLoadingOverlay();
   setText('rev-total', '…');
   if (activeView === 'overview') setText('ov-revenue', '…');
   try {
@@ -2132,6 +2146,7 @@ async function fetchRevenueCSV() {
     if (activeView === 'overview') setText('ov-revenue', 'Error');
   } finally {
     revLoading = false;
+    updateLoadingOverlay();
   }
 }
 
@@ -2691,6 +2706,7 @@ function populateProdBDEs(tlName) {
 async function fetchProductivityCSV() {
   if (prodLoading) return;
   prodLoading = true;
+  updateLoadingOverlay();
   setText('prod-calls', '…');
   try {
     const resp = await fetch(SHEETS_API.productivity);
@@ -2732,6 +2748,7 @@ async function fetchProductivityCSV() {
     setText('prod-calls', 'Error');
   } finally {
     prodLoading = false;
+    updateLoadingOverlay();
   }
 }
 
@@ -3526,6 +3543,7 @@ function laCampaignLabel(campaign) {
 async function fetchLeadCSV() {
   if (laLoading) return;
   laLoading = true;
+  updateLoadingOverlay();
   setText('la-kpi-leads', '…');
   setText('la-kpi-tokens', '…');
   setText('la-kpi-enrolled', '…');
@@ -3573,6 +3591,7 @@ async function fetchLeadCSV() {
     setText('lead-total', 'Error');
   } finally {
     laLoading = false;
+    updateLoadingOverlay();
   }
 }
 
