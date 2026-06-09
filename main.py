@@ -27,6 +27,12 @@ SHEET_URLS = {
     "cohort-targets": (
         "https://docs.google.com/spreadsheets/d/e/2PACX-1vSYw0XpoBrl5gNAHq3n2p-OLAEOHwsBVVQy70ffPRRSk2SloYaqPPZ1X6YcuesaGvzlgf1EDUE8bwJV/pub?gid=846488199&single=true&output=csv"
     ),
+    "tl-targets": (
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vSYw0XpoBrl5gNAHq3n2p-OLAEOHwsBVVQy70ffPRRSk2SloYaqPPZ1X6YcuesaGvzlgf1EDUE8bwJV/pub?gid=209837982&single=true&output=csv"
+    ),
+    "bd-targets": (
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vSYw0XpoBrl5gNAHq3n2p-OLAEOHwsBVVQy70ffPRRSk2SloYaqPPZ1X6YcuesaGvzlgf1EDUE8bwJV/pub?gid=68498859&single=true&output=csv"
+    ),
 }
 
 LEADS_CACHE = {"body": None, "fetched_at": 0.0}

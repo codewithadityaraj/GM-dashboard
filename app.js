@@ -162,6 +162,8 @@ const SHEETS_API = {
   productivity: '/api/sheets?sheet=productivity',
   revenueToken: '/api/sheets?sheet=revenue-token',
   revenueFull: '/api/sheets?sheet=revenue-full',
+  bdTargets: '/api/sheets?sheet=bd-targets',
+  tlTargets: '/api/sheets?sheet=tl-targets',
   cohortTargets: '/api/sheets?sheet=cohort-targets',
 };
 
@@ -205,8 +207,12 @@ let revTokenRows = [];
 let revFullRows = [];
 let revLoaded = false;
 let revLoading = false;
+let bdTargetRows = [];
+let bdTargetLoaded = false;
 let cohortTargetRows = [];
 let cohortLoaded = false;
+let tlTargetRows = [];
+let tlTargetLoaded = false;
 
 function isNonBlank(val) {
   return val != null && String(val).trim() !== '';
@@ -241,8 +247,6 @@ function prodOwnerMatchesBdeFilter(owner, bdeFilter) {
 
 function getOverviewProdData() {
   let pool = getProdGlobalData();
-  const programOwners = getProdOwnersForProgram();
-  if (programOwners) pool = pool.filter(r => programOwners.has(r.owner));
   if (activeFilters.tl !== 'ALL') pool = pool.filter(r => r.manager === activeFilters.tl);
   if (activeFilters.bde !== 'ALL') pool = pool.filter(r => prodOwnerMatchesBdeFilter(r.owner, activeFilters.bde));
   return pool;
@@ -840,7 +844,6 @@ function applyFilters() {
       document.getElementById('filter-program').value = 'ALL';
       document.getElementById('filter-tl').value = 'ALL';
       document.getElementById('filter-bde').value = 'ALL';
-      if (cohortLoaded) applyCohortDateRangeForFilters();
     } else if (activeFilters.program !== prevProgram) {
       activeFilters.tl = 'ALL';
       activeFilters.bde = 'ALL';
@@ -848,7 +851,6 @@ function applyFilters() {
       populateRevBDEs('ALL');
       document.getElementById('filter-tl').value = 'ALL';
       document.getElementById('filter-bde').value = 'ALL';
-      if (cohortLoaded) applyCohortDateRangeForFilters();
     } else if (activeFilters.tl !== prevTL) {
       activeFilters.bde = 'ALL';
       populateRevBDEs(activeFilters.tl);
@@ -1099,10 +1101,32 @@ function mapFullPayRow(obj) {
   };
 }
 
+function mapTlTargetRow(obj) {
+  return {
+    managerName: (obj['Manager Name'] || '').trim(),
+    programName: (obj['Program Name'] || '').trim(),
+    startDate: parseSheetDate(obj['Cohort Start Date']),
+    endDate: parseSheetDate(obj['Cohort End Date']),
+    monthTokenTarget: parseNum(obj['Month Token Target']),
+    monthEnrollmentTarget: parseNum(obj['Month Enrollment Target']),
+  };
+}
+
+function mapBdTargetRow(obj) {
+  return {
+    agentName: (obj['Agent Name'] || '').trim(),
+    agentEmail: (obj['Agent Email ID'] || '').trim().toLowerCase(),
+    programName: (obj['Program Name'] || '').trim(),
+    managerName: (obj['Manager Name'] || '').trim(),
+    gmName: (obj['GM Name'] || '').trim(),
+    startDate: parseSheetDate(obj['Cohort Start Date']),
+    endDate: parseSheetDate(obj['Cohort End Date']),
+    monthTokenTarget: parseNum(obj['Month Token Target']),
+    monthEnrollmentTarget: parseNum(obj['Month Enrollment Target']),
+  };
+}
+
 function mapCohortRow(obj) {
-  const tls = ['TL1', 'TL2', 'TL3', 'TL4', 'TL5']
-    .map(k => (obj[k] || '').trim())
-    .filter(Boolean);
   return {
     programName: (obj['Program Name'] || '').trim(),
     cohortName: (obj['Cohort Name'] || '').trim(),
@@ -1111,9 +1135,6 @@ function mapCohortRow(obj) {
     cohortTarget: parseNum(obj['Cohort Target']),
     gmTarget: parseNum(obj['GM Target']),
     gm: (obj['GM'] || '').trim(),
-    tls,
-    targetPerMonthPerBDA: parseNum(obj['Target Per Month Per BDA']),
-    targetPerDayPerBDA: parseNum(obj['Target Per Day Per BDA']),
   };
 }
 
@@ -1371,6 +1392,174 @@ function cohortDayCount(startDate, endDate) {
   return Math.max(1, Math.round((end - start) / 86400000) + 1);
 }
 
+/** Prorate TL/BD monthly token + enrollment targets over filter ∩ cohort window */
+function calculateProratedMonthlyTargets(cohortStart, cohortEnd, monthTokenTarget, monthEnrollmentTarget, filterStart, filterEnd) {
+  if (!cohortStart || !cohortEnd) {
+    return { tokenTarget: 0, enrollmentTarget: 0, tokenPerDay: 0, enrollmentPerDay: 0, elapsedDays: 0 };
+  }
+
+  const totalDays = cohortDayCount(cohortStart, cohortEnd);
+  const fStart = filterStart || cohortStart;
+  const fEnd = filterEnd || cohortEnd;
+
+  if (fEnd < cohortStart || fStart > cohortEnd) {
+    return { tokenTarget: 0, enrollmentTarget: 0, tokenPerDay: 0, enrollmentPerDay: 0, elapsedDays: 0 };
+  }
+
+  const effectiveStart = clampTargetDateStr(fStart, cohortStart, cohortEnd);
+  const effectiveEnd = clampTargetDateStr(fEnd, cohortStart, cohortEnd);
+  const elapsedDays = cohortDayCount(effectiveStart, effectiveEnd);
+  const tokenPerDay = (monthTokenTarget || 0) / totalDays;
+  const enrollmentPerDay = (monthEnrollmentTarget || 0) / totalDays;
+
+  return {
+    tokenTarget: Math.round(tokenPerDay * elapsedDays * 10) / 10,
+    enrollmentTarget: Math.round(enrollmentPerDay * elapsedDays * 10) / 10,
+    tokenPerDay: Math.round(tokenPerDay * 100) / 100,
+    enrollmentPerDay: Math.round(enrollmentPerDay * 100) / 100,
+    elapsedDays,
+  };
+}
+
+function normEmail(email) {
+  return (email || '').trim().toLowerCase();
+}
+
+function bdTargetRowsForEmail(email) {
+  const emailNorm = normEmail(email);
+  if (!emailNorm) return [];
+  return bdTargetRows.filter(r => r.agentEmail === emailNorm);
+}
+
+/** TL/BDA monthly enrollment target: (Month Enrollment Target ÷ 30) × days in filter ∩ cohort */
+function calculateBdEnrollmentTarget(monthEnrollmentTarget, cohortStart, cohortEnd, filterStart, filterEnd) {
+  if (!monthEnrollmentTarget || !cohortStart || !cohortEnd) {
+    return { target: 0, perDay: 0 };
+  }
+
+  const perDay = monthEnrollmentTarget / 30;
+  const fStart = filterStart || cohortStart;
+  const fEnd = filterEnd || cohortEnd;
+
+  if (fEnd < cohortStart || fStart > cohortEnd) {
+    return { target: 0, perDay };
+  }
+
+  const effectiveStart = clampTargetDateStr(fStart, cohortStart, cohortEnd);
+  const effectiveEnd = clampTargetDateStr(fEnd, cohortStart, cohortEnd);
+  const elapsedDays = cohortDayCount(effectiveStart, effectiveEnd);
+
+  return {
+    target: Math.round(perDay * elapsedDays * 10) / 10,
+    perDay: Math.round(perDay * 100) / 100,
+  };
+}
+
+/** GM cohort-wide target: (GM Target ÷ cohort days) × days in filter ∩ cohort */
+function calculateCohortWideTarget(cohortTarget, cohortStart, cohortEnd, filterStart, filterEnd) {
+  if (!cohortTarget || !cohortStart || !cohortEnd) {
+    return { target: 0, perDay: 0 };
+  }
+
+  const totalDays = cohortDayCount(cohortStart, cohortEnd);
+  const perDay = cohortTarget / totalDays;
+  const fStart = filterStart || cohortStart;
+  const fEnd = filterEnd || cohortEnd;
+
+  if (fEnd < cohortStart || fStart > cohortEnd) {
+    return { target: 0, perDay };
+  }
+
+  const effectiveStart = clampTargetDateStr(fStart, cohortStart, cohortEnd);
+  const effectiveEnd = clampTargetDateStr(fEnd, cohortStart, cohortEnd);
+  const elapsedDays = cohortDayCount(effectiveStart, effectiveEnd);
+
+  return {
+    target: Math.round(perDay * elapsedDays * 10) / 10,
+    perDay: Math.round(perDay * 100) / 100,
+  };
+}
+
+// GM Performance table: cohort sheet via GM column → GM Name
+function revGmSheetTarget(gmName) {
+  if (!cohortLoaded || !gmName) return { total: 0, perDay: 0 };
+
+  const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+  const { start, end } = revGetFilterDateRange();
+  let total = 0;
+  let perDay = 0;
+
+  cohortTargetRows.forEach(row => {
+    if (normTeamName(row.gm) !== normTeamName(gmName)) return;
+    if (progFilter && row.programName !== progFilter) return;
+    const baseTarget = row.gmTarget || row.cohortTarget || 0;
+    if (!baseTarget) return;
+    const r = calculateCohortWideTarget(
+      baseTarget,
+      row.startDate,
+      row.endDate,
+      start,
+      end,
+    );
+    total += r.target;
+    perDay += r.perDay;
+  });
+
+  return { total, perDay };
+}
+
+// TL Performance table: TL TARGET sheet via Manager Name → TL Name
+function revTlSheetTarget(tlName) {
+  if (!tlTargetLoaded || !tlName) return { total: 0, perDay: 0 };
+
+  const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+  const { start, end } = revGetFilterDateRange();
+  let total = 0;
+  let perDay = 0;
+
+  tlTargetRows.forEach(row => {
+    if (!normTlMatch(row.managerName, tlName)) return;
+    if (progFilter && row.programName !== progFilter) return;
+    const r = calculateBdEnrollmentTarget(
+      row.monthEnrollmentTarget,
+      row.startDate,
+      row.endDate,
+      start,
+      end,
+    );
+    total += r.target;
+    perDay += r.perDay;
+  });
+
+  return { total, perDay };
+}
+
+// BDA Performance table: BD TARGET sheet via Agent Email ID → BD Mail
+function revBdSheetTarget(email) {
+  if (!bdTargetLoaded) return { total: 0, perDay: 0 };
+
+  const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+  const { start, end } = revGetFilterDateRange();
+  const matches = bdTargetRowsForEmail(email);
+  let total = 0;
+  let perDay = 0;
+
+  matches.forEach(row => {
+    if (progFilter && row.programName !== progFilter) return;
+    const r = calculateBdEnrollmentTarget(
+      row.monthEnrollmentTarget,
+      row.startDate,
+      row.endDate,
+      start,
+      end,
+    );
+    total += r.target;
+    perDay += r.perDay;
+  });
+
+  return { total, perDay };
+}
+
 // Input sheet (productivity + leads) — BDA → TL → GM roster for target mapping only
 function normTeamName(name) {
   return (name || '').trim().toLowerCase();
@@ -1514,6 +1703,12 @@ function getInputBdaRoster(scope = {}) {
 
 function formatTargetNum(n) {
   return Number.isInteger(n) ? fNum(n) : n.toFixed(1);
+}
+
+function targetCellHtml(value, perDay) {
+  if (!value || value <= 0) return '<td class="col-num">—</td>';
+  const title = perDay ? ` title="${formatTargetNum(perDay)}/day"` : '';
+  return `<td class="col-num"${title}>${formatTargetNum(value)}</td>`;
 }
 
 function applyCohortDateRangeForFilters() {
@@ -1711,11 +1906,12 @@ async function fetchRevenueCSV() {
   setText('rev-total', '…');
   if (activeView === 'overview') setText('ov-revenue', '…');
   try {
-    const [tokenResp, fullResp, cohortResp] = await Promise.all([
+    const [tokenResp, fullResp, bdTargetResp, tlTargetResp, cohortResp] = await Promise.all([
       fetch(SHEETS_API.revenueToken),
       fetch(SHEETS_API.revenueFull),
+      fetch(SHEETS_API.bdTargets),
+      fetch(SHEETS_API.tlTargets),
       fetch(SHEETS_API.cohortTargets),
-      ensureInputMappingLoaded(),
     ]);
     if (!tokenResp.ok) throw new Error(`Token CSV HTTP ${tokenResp.status}`);
     if (!fullResp.ok) throw new Error(`Full Payment CSV HTTP ${fullResp.status}`);
@@ -1725,10 +1921,30 @@ async function fetchRevenueCSV() {
     revTokenRows = tokenRaw.map(mapTokenRow).filter(r => r.tokenDate);
     revFullRows = fullRaw.map(mapFullPayRow).filter(r => r.fullPayDate || r.amountPaid > 0);
 
+    if (bdTargetResp.ok) {
+      bdTargetRows = parseCSV(await bdTargetResp.text())
+        .map(mapBdTargetRow)
+        .filter(r => (r.agentEmail || r.agentName) && r.startDate && r.endDate);
+      bdTargetLoaded = true;
+    } else {
+      bdTargetRows = [];
+      bdTargetLoaded = false;
+    }
+
+    if (tlTargetResp.ok) {
+      tlTargetRows = parseCSV(await tlTargetResp.text())
+        .map(mapTlTargetRow)
+        .filter(r => r.managerName && r.startDate && r.endDate);
+      tlTargetLoaded = true;
+    } else {
+      tlTargetRows = [];
+      tlTargetLoaded = false;
+    }
+
     if (cohortResp.ok) {
       cohortTargetRows = parseCSV(await cohortResp.text())
         .map(mapCohortRow)
-        .filter(r => r.programName && r.startDate && r.endDate);
+        .filter(r => r.gm && r.startDate && r.endDate);
       cohortLoaded = true;
     } else {
       cohortTargetRows = [];
@@ -1774,8 +1990,6 @@ function renderRevenue() {
     fetchRevenueCSV();
     return;
   }
-  if (!prodLoaded && !prodLoading) ensureInputMappingLoaded().then(() => renderRevenue());
-  if (!prodLoaded) return;
 
   const tokenData = getBaseRevTokens();
   const fullData = getBaseRevFullPayments();
@@ -1953,14 +2167,13 @@ function renderRevenue() {
     : [activeFilters.gm];
 
   gmNames.forEach(gmName => {
-    const gmRows = [...tokenData, ...fullData].filter(r => r.gm === gmName);
     const gmTokens = revAggTokens(tokenData.filter(r => r.gm === gmName));
     const gmFull = revAggFull(fullData.filter(r => r.gm === gmName));
-    const { total: gmTarget, perDay: gmTargetDay } = revRowsCohortTarget(gmRows, gmName);
+    const { total: gmTarget, perDay: gmTargetDay } = revGmSheetTarget(gmName);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-name bold">${gmName}</td>
-      <td class="col-num" title="${gmTarget ? `${formatTargetNum(gmTargetDay)}/day` : ''}">${gmTarget ? formatTargetNum(gmTarget) : '—'}</td>
+      ${targetCellHtml(gmTarget, gmTargetDay)}
       <td class="col-num">${fNum(gmTokens.count)}</td>
       <td class="col-num">${fNum(gmFull.count)}</td>
     `;
@@ -1977,11 +2190,11 @@ function renderRevenue() {
     const tlTokens = revAggTokens(tokenData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
     const tlFull = revAggFull(fullData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
     if (tlTokens.count === 0 && tlFull.count === 0) return;
-    const { total: tlTarget, perDay: tlTargetDay } = revTlRowsCohortTarget(tlName);
+    const { total: tlTarget, perDay: tlTargetDay } = revTlSheetTarget(tlName);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-name bold">${tlName}</td>
-      <td class="col-num" title="${tlTarget ? `${formatTargetNum(tlTargetDay)}/day` : ''}">${tlTarget ? formatTargetNum(tlTarget) : '—'}</td>
+      ${targetCellHtml(tlTarget, tlTargetDay)}
       <td class="col-num">${fNum(tlTokens.count)}</td>
       <td class="col-num">${fNum(tlFull.count)}</td>
     `;
@@ -2006,12 +2219,11 @@ function renderRevenue() {
   Object.keys(bdeMap).sort().forEach(bd => {
     const tAgg = revAggTokens(bdeMap[bd].tokens);
     const fAgg = revAggFull(bdeMap[bd].full);
-    const bdeRows = [...bdeMap[bd].tokens, ...bdeMap[bd].full];
-    const { total: bdeTarget, perDay: bdeTargetDay } = revBdaRowsCohortTarget(bdeRows);
+    const { total: bdeTarget, perDay: bdeTargetDay } = revBdSheetTarget(bd);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-name bold" title="${bd}">${bd}</td>
-      <td class="col-num" title="${bdeTarget ? `${formatTargetNum(bdeTargetDay)}/day` : ''}">${bdeTarget ? formatTargetNum(bdeTarget) : '—'}</td>
+      ${targetCellHtml(bdeTarget, bdeTargetDay)}
       <td class="col-num">${fNum(tAgg.count)}</td>
       <td class="col-num">${fNum(fAgg.count)}</td>
     `;
@@ -2073,6 +2285,7 @@ function mapProdRow(obj) {
   return {
     owner: obj['Owner Name'] || '',
     date: (obj['Date'] || '').substring(0, 10),
+    program: (obj['Program Name'] || '').trim(),
     calls: parseNum(obj['# Calls']),
     connected: parseNum(obj['# Calls Connected']),
     uniqueLeads: parseNum(obj['# Unique Leads']),
@@ -2082,33 +2295,18 @@ function mapProdRow(obj) {
   };
 }
 
-function getProdOwnersForProgram() {
-  if (activeFilters.program === 'ALL' || !laLoaded) return null;
-  const owners = new Set(
-    laAllRows
-      .filter(r => {
-        const inGM = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
-        return inGM && r.program === activeFilters.program;
-      })
-      .map(r => r.owner)
-      .filter(Boolean)
-  );
-  return owners;
-}
-
 function getProdGlobalData() {
   return prodAllRows.filter(r => {
     const inDate = (!activeFilters.dateFrom || r.date >= activeFilters.dateFrom) &&
       (!activeFilters.dateTo || r.date <= activeFilters.dateTo);
     const inGM = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
-    return inDate && inGM && r.owner;
+    const inProgram = activeFilters.program === 'ALL' || r.program === activeFilters.program;
+    return inDate && inGM && inProgram && r.owner;
   });
 }
 
 function getBaseProdData() {
   let pool = getProdGlobalData();
-  const programOwners = getProdOwnersForProgram();
-  if (programOwners) pool = pool.filter(r => programOwners.has(r.owner));
   if (activeFilters.tl !== 'ALL') pool = pool.filter(r => r.manager === activeFilters.tl);
   if (activeFilters.bde !== 'ALL') pool = pool.filter(r => r.owner === activeFilters.bde);
   return pool;
@@ -2154,12 +2352,12 @@ function populateProdPrograms() {
   const sel = document.getElementById('filter-program');
   if (!sel) return;
   sel.innerHTML = '<option value="ALL">All Programs</option>';
-  if (!laLoaded) {
+  if (!prodLoaded) {
     sel.value = 'ALL';
     activeFilters.program = 'ALL';
     return;
   }
-  let pool = laAllRows;
+  let pool = prodAllRows;
   if (activeFilters.gm !== 'ALL') pool = pool.filter(r => r.gm === activeFilters.gm);
   const programs = [...new Set(pool.map(r => r.program).filter(Boolean))].sort();
   programs.forEach(p => {
@@ -2175,9 +2373,7 @@ function populateProdPrograms() {
 function populateProdTLs() {
   const sel = document.getElementById('filter-tl');
   if (!sel) return;
-  let pool = getProdGlobalData();
-  const programOwners = getProdOwnersForProgram();
-  if (programOwners) pool = pool.filter(r => programOwners.has(r.owner));
+  const pool = getProdGlobalData();
   const tls = [...new Set(pool.map(r => r.manager).filter(Boolean))].sort();
   sel.innerHTML = '<option value="ALL">All TLs</option>';
   tls.forEach(t => {
@@ -2194,8 +2390,6 @@ function populateProdBDEs(tlName) {
   const sel = document.getElementById('filter-bde');
   if (!sel) return;
   let pool = getProdGlobalData();
-  const programOwners = getProdOwnersForProgram();
-  if (programOwners) pool = pool.filter(r => programOwners.has(r.owner));
   if (tlName && tlName !== 'ALL') pool = pool.filter(r => r.manager === tlName);
   const bdes = [...new Set(pool.map(r => r.owner).filter(Boolean))].sort();
   sel.innerHTML = '<option value="ALL">All BDEs</option>';
@@ -2265,6 +2459,21 @@ function prodAggregate(rows) {
   return { calls, connects, uniqueDialled, talk, activeBdes };
 }
 
+// Calendar working days in date range (Mon–Sat; Sundays excluded as week off)
+function prodCalendarWorkingDaysExclSunday(dateFrom, dateTo) {
+  if (!dateFrom || !dateTo) return 0;
+  const start = new Date(dateFrom + 'T00:00:00');
+  const end   = new Date(dateTo + 'T00:00:00');
+  if (end < start) return 0;
+  let count = 0;
+  const d = new Date(start);
+  while (d <= end) {
+    if (d.getDay() !== 0) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
 // LS working days: each owner-date with at least 1 call counts as 1
 function prodWorkingDaysCount(rows) {
   const days = new Set();
@@ -2274,6 +2483,37 @@ function prodWorkingDaysCount(rows) {
     }
   });
   return days.size;
+}
+
+// Unique TL|BDA units in scope (for per-TL per-BD average)
+function prodTlBdeUnitCount(rows) {
+  const units = new Set();
+  rows.forEach(r => {
+    if (!r.owner) return;
+    const tl = activeFilters.tl === 'ALL' ? (r.manager || '—') : (activeFilters.tl || r.manager || '—');
+    units.add(`${tl}|${r.owner}`);
+  });
+  return Math.max(1, units.size);
+}
+
+// KPI denominator: working days excl. Sun (× TL-BD units when not a single BDE)
+function prodKpiDenominator(rows) {
+  const workingDays = prodCalendarWorkingDaysExclSunday(activeFilters.dateFrom, activeFilters.dateTo);
+  if (!workingDays) return 0;
+  if (activeFilters.bde !== 'ALL') return workingDays;
+  return workingDays * prodTlBdeUnitCount(rows);
+}
+
+function prodAvgDialledPerDay(rows) {
+  const totalCalls = rows.reduce((s, r) => s + r.calls, 0);
+  const denom = prodKpiDenominator(rows);
+  return denom ? (totalCalls / denom).toFixed(1) : '0.0';
+}
+
+function prodAvgTalktimePerDay(rows) {
+  const totalTalkMin = rows.reduce((s, r) => s + r.talkTimeMin, 0);
+  const denom = prodKpiDenominator(rows);
+  return denom ? formatTalkHrs(totalTalkMin / denom) : '0.0h';
 }
 
 function prodAvgCall(rows) {
@@ -2313,22 +2553,26 @@ function renderProductivity() {
 
   const connectRate = totalCalls ? ((connected / totalCalls) * 100).toFixed(1) : 0;
   const talkHrs = (talkMins / 60).toFixed(1);
-  const avgTalkSec = connected ? Math.round((talkMins * 60) / connected) : 0;
 
-  const allOwnersInScope = new Set(getProdGlobalData().map(r => r.owner));
-  const programOwners = getProdOwnersForProgram();
-  const totalBDEs = programOwners
-    ? [...programOwners].filter(o => allOwnersInScope.has(o)).length
-    : allOwnersInScope.size;
+  // Total team size = all unique owners in the full productivity data (no date filter, respects GM/program filter)
+  const allOwnersInScope = new Set(
+    prodAllRows.filter(r => {
+      const inGM = activeFilters.gm === 'ALL' ? isGMAllowed(r.gm) : r.gm === activeFilters.gm;
+      const inProgram = activeFilters.program === 'ALL' || r.program === activeFilters.program;
+      const inTL = activeFilters.tl === 'ALL' || r.manager === activeFilters.tl;
+      return inGM && inProgram && inTL && r.owner;
+    }).map(r => r.owner)
+  );
+  const totalTeamSize = allOwnersInScope.size;
 
-  setText('prod-calls', fNum(totalCalls));
-  setText('prod-calls-sub', `${fNum(connected)} connected`);
+  setText('prod-calls', prodAvgDialledPerDay(cData));
+  setText('prod-calls-sub', `${fNum(totalCalls)} total dials`);
   setText('prod-connect', `${connectRate}%`);
   setText('prod-connect-sub', `${fNum(connected)} connected calls`);
-  setText('prod-talk', `${talkHrs}h`);
-  setText('prod-talk-sub', `Avg ${avgTalkSec}s per connect`);
-  setText('prod-active', `${activeBDEs}/${totalBDEs || activeBDEs}`);
-  setText('prod-active-sub', `active in period`);
+  setText('prod-talk', prodAvgTalktimePerDay(cData));
+  setText('prod-talk-sub', `${talkHrs}h total talk time`);
+  setText('prod-active', fNum(totalTeamSize));
+  setText('prod-active-sub', `${activeBDEs} active in period`);
 
   // Top 3 BDAs by Total Talk Time (TT)
   const bdaPodiumContainer = document.getElementById('prod-podium-bdas');
@@ -2431,19 +2675,53 @@ function renderProductivity() {
   });
   if (tlTbody.innerHTML === '') emptyRow(tlTbody, 9);
 
-  // BDA Performance ← Owner Name
+  // BDA Performance ← Owner Name (with TL when All TLs selected)
   const bdaTbody = document.getElementById('prod-bda-perf-table');
+  const bdaTable = bdaTbody?.closest('table');
+  const showTlCol = activeFilters.tl === 'ALL';
+  const bdaColSpan = showTlCol ? 10 : 9;
+
+  if (bdaTable) {
+    const thead = bdaTable.querySelector('thead tr');
+    if (thead) {
+      thead.innerHTML = showTlCol
+        ? `<th class="col-name">BDA Name</th><th class="col-name">TL Name</th><th class="col-num">Total Call</th><th class="col-num">Total Connected</th><th class="col-num">Unique Dialled</th><th class="col-num">CPL</th><th class="col-num">TT</th><th class="col-num">Avg Call</th><th class="col-num">Avg CC</th><th class="col-num">Avg TT</th>`
+        : `<th class="col-name">BDA Name</th><th class="col-num">Total Call</th><th class="col-num">Total Connected</th><th class="col-num">Unique Dialled</th><th class="col-num">CPL</th><th class="col-num">TT</th><th class="col-num">Avg Call</th><th class="col-num">Avg CC</th><th class="col-num">Avg TT</th>`;
+    }
+  }
+
   bdaTbody.innerHTML = '';
 
-  Object.keys(bdeMap).sort().forEach(owner => {
+  const owners = Object.keys(bdeMap).sort((a, b) => {
+    if (!showTlCol) return a.localeCompare(b);
+    const tlA = bdeMap[a][0]?.manager || '';
+    const tlB = bdeMap[b][0]?.manager || '';
+    return a.localeCompare(b) || tlA.localeCompare(tlB);
+  });
+
+  owners.forEach(owner => {
     const bdeRows = bdeMap[owner];
+    const tlName = bdeRows[0]?.manager || '—';
     const { calls: dials, connects, uniqueDialled, talk } = prodAggregate(bdeRows);
     const bdeAvgCall = prodAvgCall(bdeRows);
     const bdeAvgCC = prodAvgCC(bdeRows);
     const bdeAvgTT = prodAvgTT(bdeRows);
 
     const tr = document.createElement('tr');
-    tr.innerHTML = `
+    tr.innerHTML = showTlCol
+      ? `
+      <td class="col-name bold">${owner}</td>
+      <td class="col-name">${tlName}</td>
+      <td class="col-num">${fNum(dials)}</td>
+      <td class="col-num">${fNum(connects)}</td>
+      <td class="col-num">${fNum(uniqueDialled)}</td>
+      <td class="col-num">${prodCPL(dials, uniqueDialled)}</td>
+      <td class="col-num">${formatTalkHrs(talk)}</td>
+      <td class="col-num">${bdeAvgCall}</td>
+      <td class="col-num">${bdeAvgCC}</td>
+      <td class="col-num">${bdeAvgTT}</td>
+    `
+      : `
       <td class="col-name bold">${owner}</td>
       <td class="col-num">${fNum(dials)}</td>
       <td class="col-num">${fNum(connects)}</td>
@@ -2456,7 +2734,7 @@ function renderProductivity() {
     `;
     bdaTbody.appendChild(tr);
   });
-  if (bdaTbody.innerHTML === '') emptyRow(bdaTbody, 9);
+  if (bdaTbody.innerHTML === '') emptyRow(bdaTbody, bdaColSpan);
 }
 
 // ==========================================
@@ -2955,6 +3233,11 @@ function mapCSVRow(obj) {
   };
 }
 
+function laCampaignLabel(campaign) {
+  const c = (campaign || '').trim();
+  return c || 'Unknown';
+}
+
 async function fetchLeadCSV() {
   if (laLoading) return;
   laLoading = true;
@@ -3194,7 +3477,7 @@ function renderLeadAnalysis() {
   populateTableTLAndBDE('t2-filter-tl', 't2-filter-bde', base);
   populateTableTLAndBDE('t3-filter-tl', 't3-filter-bde', base);
   populateTableSourceDropdown('t2-filter-source', base, 'subSource');
-  populateTableSourceDropdown('t3-filter-source', base, 'source');
+  populateTableSourceDropdown('t3-filter-source', base, 'subSource');
   populateTableCampaignDropdown('t3-filter-campaign', base);
 
   // KPI strip
@@ -3262,7 +3545,7 @@ function populateTableCampaignDropdown(selId, basePool) {
   const sel = document.getElementById(selId);
   if (!sel) return;
   const selected = sel.value || 'ALL';
-  const campaigns = [...new Set(basePool.map(r => r.campaign).filter(Boolean))].sort();
+  const campaigns = [...new Set(basePool.map(r => laCampaignLabel(r.campaign)))].sort();
   sel.innerHTML = '<option value="ALL">All Campaigns</option>';
   campaigns.forEach(c => {
     const opt = document.createElement('option');
@@ -3429,6 +3712,18 @@ function resetT2() {
 }
 
 // --- Table 3: Campaign-wise ---
+function getT3CampaignPool(base, subSourceVal) {
+  if (!subSourceVal || subSourceVal === 'ALL') return base;
+  return base.filter(r => r.subSource === subSourceVal);
+}
+
+function onT3SubSourceChange() {
+  const base = getBaseLAData();
+  const srcVal = document.getElementById('t3-filter-source')?.value || 'ALL';
+  populateTableCampaignDropdown('t3-filter-campaign', getT3CampaignPool(base, srcVal));
+  renderTable3();
+}
+
 function onT3TLChange() {
   const tlSel = document.getElementById('t3-filter-tl');
   const bdeSel = document.getElementById('t3-filter-bde');
@@ -3454,8 +3749,8 @@ function renderTable3() {
   const tlVal = document.getElementById('t3-filter-tl')?.value || 'ALL';
   const bdeVal = document.getElementById('t3-filter-bde')?.value || 'ALL';
   const pool = base.filter(r =>
-    (cmpVal === 'ALL' || r.campaign === cmpVal) &&
-    (srcVal === 'ALL' || r.source === srcVal) &&
+    (cmpVal === 'ALL' || laCampaignLabel(r.campaign) === cmpVal) &&
+    (srcVal === 'ALL' || r.subSource === srcVal) &&
     (tlVal === 'ALL' || r.tl === tlVal) &&
     (bdeVal === 'ALL' || r.owner === bdeVal)
   );
@@ -3473,7 +3768,7 @@ function resetT3() {
   if (bdeSel) bdeSel.value = 'ALL';
   const base = getBaseLAData();
   populateTableCampaignDropdown('t3-filter-campaign', base);
-  populateTableSourceDropdown('t3-filter-source', base);
+  populateTableSourceDropdown('t3-filter-source', base, 'subSource');
   populateTableTLAndBDE('t3-filter-tl', 't3-filter-bde', base);
   renderTable3();
 }
@@ -3490,7 +3785,7 @@ function renderLATable(tbodyId, pool, groupBy) {
     let key;
     if (groupBy === 'source') key = r.source || '(unknown)';
     else if (groupBy === 'subSource') key = r.subSource || '(unknown)';
-    else if (groupBy === 'campaign') key = r.campaign || '(unknown)';
+    else if (groupBy === 'campaign') key = laCampaignLabel(r.campaign);
     else key = r.createdOn || '(unknown)';
 
     if (!map[key]) map[key] = { leads: 0, tokens: 0, enrolled: 0 };

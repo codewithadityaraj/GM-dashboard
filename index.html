@@ -623,14 +623,14 @@
               <table class="simple-table perf-table perf-table-rev">
                 <colgroup>
                   <col style="width:160px">
-                  <col style="width:72px">
+                  <col style="width:104px">
                   <col style="width:128px">
                   <col style="width:104px">
                 </colgroup>
                 <thead>
                   <tr>
                     <th class="col-name">GM Name</th>
-                    <th class="col-num">Target</th>
+                    <th class="col-num">Enrollment Target</th>
                     <th class="col-num">Token Collected</th>
                     <th class="col-num">Enrollment</th>
                   </tr>
@@ -651,14 +651,14 @@
               <table class="simple-table perf-table perf-table-rev">
                 <colgroup>
                   <col style="width:160px">
-                  <col style="width:72px">
+                  <col style="width:104px">
                   <col style="width:128px">
                   <col style="width:104px">
                 </colgroup>
                 <thead>
                   <tr>
                     <th class="col-name">TL Name</th>
-                    <th class="col-num">Target</th>
+                    <th class="col-num">Enrollment Target</th>
                     <th class="col-num">Token Collected</th>
                     <th class="col-num">Enrollment</th>
                   </tr>
@@ -679,14 +679,14 @@
               <table class="simple-table perf-table perf-table-rev perf-table-rev-bda">
                 <colgroup>
                   <col style="width:280px">
-                  <col style="width:72px">
+                  <col style="width:104px">
                   <col style="width:128px">
                   <col style="width:104px">
                 </colgroup>
                 <thead>
                   <tr>
                     <th class="col-name">BD Mail</th>
-                    <th class="col-num">Target</th>
+                    <th class="col-num">Enrollment Target</th>
                     <th class="col-num">Token Collected</th>
                     <th class="col-num">Enrollment</th>
                   </tr>
@@ -733,7 +733,7 @@
 
             <div class="kpi-card accent-indigo">
               <div class="kpi-top">
-                <span class="kpi-label">Total Calls</span>
+                <span class="kpi-label">Avg Dialled / Day</span>
                 <div class="kpi-icon">
                   <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                     <path
@@ -741,8 +741,8 @@
                   </svg>
                 </div>
               </div>
-              <div class="kpi-value" id="prod-calls">0</div>
-              <div class="kpi-sub" id="prod-calls-sub">total dials</div>
+              <div class="kpi-value" id="prod-calls">0.0</div>
+              <div class="kpi-sub" id="prod-calls-sub">0 total dials</div>
             </div>
 
             <div class="kpi-card accent-emerald">
@@ -760,7 +760,7 @@
 
             <div class="kpi-card accent-purple">
               <div class="kpi-top">
-                <span class="kpi-label">Total Talk Time</span>
+                <span class="kpi-label">Avg Talk Time</span>
                 <div class="kpi-icon">
                   <svg fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="10" />
@@ -768,13 +768,13 @@
                   </svg>
                 </div>
               </div>
-              <div class="kpi-value" id="prod-talk">0h</div>
-              <div class="kpi-sub" id="prod-talk-sub">avg per call</div>
+              <div class="kpi-value" id="prod-talk">0.0h</div>
+              <div class="kpi-sub" id="prod-talk-sub">0h total talk time</div>
             </div>
 
             <div class="kpi-card accent-amber">
               <div class="kpi-top">
-                <span class="kpi-label">Active BDEs</span>
+                <span class="kpi-label">Active Team Size</span>
                 <div class="kpi-icon">
                   <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -1257,9 +1257,9 @@
             <!-- Table 3 Filters: Campaign + Source + TL + BDE -->
             <div class="la-inline-filters la-filters-t3">
               <div class="la-filter-group">
-                <label class="la-filter-lbl">Source</label>
-                <select class="la-select" id="t3-filter-source" onchange="renderTable3()">
-                  <option value="ALL">All Sources</option>
+                <label class="la-filter-lbl">Sub Source</label>
+                <select class="la-select" id="t3-filter-source" onchange="onT3SubSourceChange()">
+                  <option value="ALL">All Sub Sources</option>
                 </select>
               </div>
               <div class="la-filter-group">
