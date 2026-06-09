@@ -1392,6 +1392,13 @@ function cohortDayCount(startDate, endDate) {
   return Math.max(1, Math.round((end - start) / 86400000) + 1);
 }
 
+function oneDayBefore(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+}
+
 /** Prorate TL/BD monthly token + enrollment targets over filter ∩ cohort window */
 function calculateProratedMonthlyTargets(cohortStart, cohortEnd, monthTokenTarget, monthEnrollmentTarget, filterStart, filterEnd) {
   if (!cohortStart || !cohortEnd) {
@@ -1429,6 +1436,59 @@ function bdTargetRowsForEmail(email) {
   const emailNorm = normEmail(email);
   if (!emailNorm) return [];
   return bdTargetRows.filter(r => r.agentEmail === emailNorm);
+}
+
+/** Count full enrollments for a BDA in an arbitrary date range (uses unfiltered revFullRows) */
+function bdaPastActualEnrollments(email, fromDate, toDate, progFilter) {
+  if (!email || !fromDate || !toDate || toDate < fromDate) return 0;
+  const emailNorm = normEmail(email);
+  return revFullRows.filter(r => {
+    if (!r.fullPayDate) return false;
+    if (normEmail(r.bdMail) !== emailNorm) return false;
+    if (r.fullPayDate < fromDate || r.fullPayDate > toDate) return false;
+    if (progFilter && progFilter !== 'ALL' && r.type !== progFilter) return false;
+    return true;
+  }).length;
+}
+
+/** Count full enrollments under a TL in an arbitrary date range (uses unfiltered revFullRows) */
+function tlPastActualEnrollments(tlName, fromDate, toDate, progFilter) {
+  if (!tlName || !fromDate || !toDate || toDate < fromDate) return 0;
+  return revFullRows.filter(r => {
+    if (!r.fullPayDate) return false;
+    if (normTeamName(r.tl) !== normTeamName(tlName)) return false;
+    if (r.fullPayDate < fromDate || r.fullPayDate > toDate) return false;
+    if (progFilter && progFilter !== 'ALL' && r.type !== progFilter) return false;
+    return true;
+  }).length;
+}
+
+/** Count full enrollments under a GM in an arbitrary date range (uses unfiltered revFullRows) */
+function gmPastActualEnrollments(gmName, fromDate, toDate, progFilter) {
+  if (!gmName || !fromDate || !toDate || toDate < fromDate) return 0;
+  return revFullRows.filter(r => {
+    if (!r.fullPayDate) return false;
+    if (normTeamName(r.gm) !== normTeamName(gmName)) return false;
+    if (r.fullPayDate < fromDate || r.fullPayDate > toDate) return false;
+    if (progFilter && progFilter !== 'ALL' && r.type !== progFilter) return false;
+    return true;
+  }).length;
+}
+
+/** Past-period enrollment deficit: cohortStart → filterStart-1 */
+function calculateBdaPastDeficit(monthEnrollmentTarget, cohortStart, cohortEnd, filterStart, pastActual) {
+  if (!monthEnrollmentTarget || !cohortStart || !cohortEnd || !filterStart) return 0;
+
+  const basePerDay = monthEnrollmentTarget / 30;
+  const pastEnd = oneDayBefore(filterStart);
+  if (pastEnd < cohortStart) return 0;
+
+  const effectivePastStart = clampTargetDateStr(cohortStart, cohortStart, cohortEnd);
+  const effectivePastEnd = clampTargetDateStr(pastEnd, cohortStart, cohortEnd);
+  const pastDays = cohortDayCount(effectivePastStart, effectivePastEnd);
+  const pastTarget = basePerDay * pastDays;
+
+  return Math.max(0, Math.round((pastTarget - (pastActual || 0)) * 10) / 10);
 }
 
 /** TL/BDA monthly enrollment target: (Month Enrollment Target ÷ 30) × days in filter ∩ cohort */
@@ -1480,6 +1540,23 @@ function calculateCohortWideTarget(cohortTarget, cohortStart, cohortEnd, filterS
   };
 }
 
+/** Past-period cohort-wide enrollment deficit: cohortStart → filterStart-1 */
+function calculateCohortWidePastDeficit(cohortTarget, cohortStart, cohortEnd, filterStart, pastActual) {
+  if (!cohortTarget || !cohortStart || !cohortEnd || !filterStart) return 0;
+
+  const totalDays = cohortDayCount(cohortStart, cohortEnd);
+  const basePerDay = cohortTarget / totalDays;
+  const pastEnd = oneDayBefore(filterStart);
+  if (pastEnd < cohortStart) return 0;
+
+  const effectivePastStart = clampTargetDateStr(cohortStart, cohortStart, cohortEnd);
+  const effectivePastEnd = clampTargetDateStr(pastEnd, cohortStart, cohortEnd);
+  const pastDays = cohortDayCount(effectivePastStart, effectivePastEnd);
+  const pastTarget = basePerDay * pastDays;
+
+  return Math.max(0, Math.round((pastTarget - (pastActual || 0)) * 10) / 10);
+}
+
 // GM Performance table: cohort sheet via GM column → GM Name
 function revGmSheetTarget(gmName) {
   if (!cohortLoaded || !gmName) return { total: 0, perDay: 0 };
@@ -1508,6 +1585,19 @@ function revGmSheetTarget(gmName) {
   return { total, perDay };
 }
 
+// GM filter-period enrollment deficit: max(0, enrollment target − actual) in selected date range
+function revGmCurrentDeficit(gmName) {
+  if (!gmName) return { deficit: 0 };
+
+  const { total: target } = revGmSheetTarget(gmName);
+  const actual = revFullRows.filter(r =>
+    revMatchesFilters(r, 'fullPayDate') && normTeamName(r.gm) === normTeamName(gmName)
+  ).length;
+
+  const deficit = Math.max(0, Math.round((target - actual) * 10) / 10);
+  return { deficit };
+}
+
 // TL Performance table: TL TARGET sheet via Manager Name → TL Name
 function revTlSheetTarget(tlName) {
   if (!tlTargetLoaded || !tlName) return { total: 0, perDay: 0 };
@@ -1534,6 +1624,35 @@ function revTlSheetTarget(tlName) {
   return { total, perDay };
 }
 
+// TL past-period enrollment deficit before filter start (cohortStart → filterStart-1)
+function revTlCurrentDeficit(tlName) {
+  if (!tlTargetLoaded || !tlName) return { deficit: 0 };
+
+  const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+  const { start } = revGetFilterDateRange();
+  let deficit = 0;
+
+  tlTargetRows.forEach(row => {
+    if (!normTlMatch(row.managerName, tlName)) return;
+    if (progFilter && row.programName !== progFilter) return;
+
+    const pastEnd = oneDayBefore(start);
+    const pastActual = (pastEnd >= row.startDate)
+      ? tlPastActualEnrollments(tlName, row.startDate, pastEnd, activeFilters.program)
+      : 0;
+
+    deficit += calculateBdaPastDeficit(
+      row.monthEnrollmentTarget,
+      row.startDate,
+      row.endDate,
+      start,
+      pastActual,
+    );
+  });
+
+  return { deficit };
+}
+
 // BDA Performance table: BD TARGET sheet via Agent Email ID → BD Mail
 function revBdSheetTarget(email) {
   if (!bdTargetLoaded) return { total: 0, perDay: 0 };
@@ -1558,6 +1677,35 @@ function revBdSheetTarget(email) {
   });
 
   return { total, perDay };
+}
+
+// BDA past-period enrollment deficit before filter start (cohortStart → filterStart-1)
+function revBdCurrentDeficit(email) {
+  if (!bdTargetLoaded) return { deficit: 0 };
+
+  const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+  const { start } = revGetFilterDateRange();
+  const matches = bdTargetRowsForEmail(email);
+  let deficit = 0;
+
+  matches.forEach(row => {
+    if (progFilter && row.programName !== progFilter) return;
+
+    const pastEnd = oneDayBefore(start);
+    const pastActual = (pastEnd >= row.startDate)
+      ? bdaPastActualEnrollments(email, row.startDate, pastEnd, activeFilters.program)
+      : 0;
+
+    deficit += calculateBdaPastDeficit(
+      row.monthEnrollmentTarget,
+      row.startDate,
+      row.endDate,
+      start,
+      pastActual,
+    );
+  });
+
+  return { deficit };
 }
 
 // Input sheet (productivity + leads) — BDA → TL → GM roster for target mapping only
@@ -2162,74 +2310,201 @@ function renderRevenue() {
   // GM Performance
   const gmTbody = document.getElementById('rev-gm-table');
   gmTbody.innerHTML = '';
-  const gmNames = activeFilters.gm === 'ALL'
-    ? [...new Set([...tokenData, ...fullData].map(r => r.gm).filter(Boolean))].sort()
-    : [activeFilters.gm];
+  const gmMap = {};
+  const gmDisplayName = {};
 
-  gmNames.forEach(gmName => {
-    const gmTokens = revAggTokens(tokenData.filter(r => r.gm === gmName));
-    const gmFull = revAggFull(fullData.filter(r => r.gm === gmName));
-    const { total: gmTarget, perDay: gmTargetDay } = revGmSheetTarget(gmName);
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
+  const ensureGmEntry = (name) => {
+    const key = normTeamName(name);
+    if (!key) return null;
+    if (!gmMap[key]) {
+      gmMap[key] = { tokens: [], full: [] };
+      gmDisplayName[key] = name;
+    }
+    return key;
+  };
+
+  tokenData.forEach(r => {
+    if (!r.gm) return;
+    const key = ensureGmEntry(r.gm);
+    gmMap[key].tokens.push(r);
+  });
+  fullData.forEach(r => {
+    if (!r.gm) return;
+    const key = ensureGmEntry(r.gm);
+    gmMap[key].full.push(r);
+  });
+
+  if (cohortLoaded) {
+    const { start: fStart, end: fEnd } = revGetFilterDateRange();
+    const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+    cohortTargetRows.forEach(row => {
+      if (!row.gm) return;
+      if (progFilter && row.programName !== progFilter) return;
+      if (activeFilters.gm !== 'ALL' && normTeamName(row.gm) !== normTeamName(activeFilters.gm)) return;
+      if (activeFilters.gm === 'ALL' && !isGMAllowed(row.gm)) return;
+      if (!row.startDate || !row.endDate) return;
+      if (fEnd < row.startDate || fStart > row.endDate) return;
+      ensureGmEntry(row.gm);
+    });
+  }
+
+  Object.keys(gmMap)
+    .sort((a, b) => (gmDisplayName[a] || a).localeCompare(gmDisplayName[b] || b))
+    .forEach(key => {
+      const gmName = gmDisplayName[key] || key;
+      const gmTokens = revAggTokens(gmMap[key].tokens);
+      const gmFull = revAggFull(gmMap[key].full);
+      const { total: gmTarget, perDay: gmTargetDay } = revGmSheetTarget(gmName);
+      const { deficit: gmDeficit } = revGmCurrentDeficit(gmName);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
       <td class="col-name bold">${gmName}</td>
       ${targetCellHtml(gmTarget, gmTargetDay)}
-      <td class="col-num">${fNum(gmTokens.count)}</td>
-      <td class="col-num">${fNum(gmFull.count)}</td>
+      <td class="col-num">${gmTokens.count > 0 ? fNum(gmTokens.count) : '—'}</td>
+      <td class="col-num">${gmFull.count > 0 ? fNum(gmFull.count) : '—'}</td>
+      <td class="col-num">${gmDeficit > 0 ? formatTargetNum(gmDeficit) : '—'}</td>
     `;
-    gmTbody.appendChild(tr);
-  });
-  if (gmTbody.innerHTML === '') emptyRow(gmTbody, 4);
+      gmTbody.appendChild(tr);
+    });
+  if (gmTbody.innerHTML === '') emptyRow(gmTbody, 5);
 
   // TL Performance
   const tlTbody = document.getElementById('rev-tl-perf-table');
   tlTbody.innerHTML = '';
-  const tlNames = [...new Set([...tokenData, ...fullData].map(r => r.tl).filter(Boolean))].sort();
-  tlNames.forEach(tlName => {
-    const tlRows = [...tokenData, ...fullData].filter(r => normTeamName(r.tl) === normTeamName(tlName));
-    const tlTokens = revAggTokens(tokenData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
-    const tlFull = revAggFull(fullData.filter(r => normTeamName(r.tl) === normTeamName(tlName)));
-    if (tlTokens.count === 0 && tlFull.count === 0) return;
-    const { total: tlTarget, perDay: tlTargetDay } = revTlSheetTarget(tlName);
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
+  const tlMap = {};
+  const tlDisplayName = {};
+
+  const findTlKey = (name) => {
+    return Object.keys(tlMap).find(k => normTlMatch(tlDisplayName[k] || k, name)) || null;
+  };
+
+  const ensureTlEntry = (name) => {
+    if (!name) return null;
+    const existing = findTlKey(name);
+    if (existing) return existing;
+    const key = normTeamName(name);
+    tlMap[key] = { tokens: [], full: [] };
+    tlDisplayName[key] = name;
+    return key;
+  };
+
+  const tlInGmScope = (tlName) => {
+    if (activeFilters.gm !== 'ALL') {
+      const gm = activeFilters.gm;
+      if ([...revTokenRows, ...revFullRows].some(r => normTlMatch(r.tl, tlName) && r.gm === gm)) return true;
+      if (bdTargetRows.some(r => normTlMatch(r.managerName, tlName) && normTeamName(r.gmName) === normTeamName(gm))) return true;
+      return false;
+    }
+    if ([...revTokenRows, ...revFullRows].some(r => normTlMatch(r.tl, tlName) && isGMAllowed(r.gm))) return true;
+    if (bdTargetRows.some(r => normTlMatch(r.managerName, tlName) && isGMAllowed(r.gmName))) return true;
+    return true;
+  };
+
+  tokenData.forEach(r => {
+    if (!r.tl) return;
+    const key = ensureTlEntry(r.tl);
+    tlMap[key].tokens.push(r);
+  });
+  fullData.forEach(r => {
+    if (!r.tl) return;
+    const key = ensureTlEntry(r.tl);
+    tlMap[key].full.push(r);
+  });
+
+  if (tlTargetLoaded) {
+    const { start: fStart, end: fEnd } = revGetFilterDateRange();
+    const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+    tlTargetRows.forEach(row => {
+      if (!row.managerName) return;
+      if (progFilter && row.programName !== progFilter) return;
+      if (activeFilters.tl !== 'ALL' && !normTlMatch(row.managerName, activeFilters.tl)) return;
+      if (!tlInGmScope(row.managerName)) return;
+      if (!row.startDate || !row.endDate) return;
+      if (fEnd < row.startDate || fStart > row.endDate) return;
+      ensureTlEntry(row.managerName);
+    });
+  }
+
+  Object.keys(tlMap)
+    .sort((a, b) => (tlDisplayName[a] || a).localeCompare(tlDisplayName[b] || b))
+    .forEach(key => {
+      const tlName = tlDisplayName[key] || key;
+      const tlTokens = revAggTokens(tlMap[key].tokens);
+      const tlFull = revAggFull(tlMap[key].full);
+      const { total: tlTarget, perDay: tlTargetDay } = revTlSheetTarget(tlName);
+      const { deficit: tlDeficit } = revTlCurrentDeficit(tlName);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
       <td class="col-name bold">${tlName}</td>
       ${targetCellHtml(tlTarget, tlTargetDay)}
-      <td class="col-num">${fNum(tlTokens.count)}</td>
-      <td class="col-num">${fNum(tlFull.count)}</td>
+      <td class="col-num">${tlTokens.count > 0 ? fNum(tlTokens.count) : '—'}</td>
+      <td class="col-num">${tlFull.count > 0 ? fNum(tlFull.count) : '—'}</td>
+      <td class="col-num">${tlDeficit > 0 ? formatTargetNum(tlDeficit) : '—'}</td>
     `;
-    tlTbody.appendChild(tr);
-  });
-  if (tlTbody.innerHTML === '') emptyRow(tlTbody, 4);
+      tlTbody.appendChild(tr);
+    });
+  if (tlTbody.innerHTML === '') emptyRow(tlTbody, 5);
 
   // BDA Performance
   const bdaTbody = document.getElementById('rev-bda-table');
   bdaTbody.innerHTML = '';
   const bdeMap = {};
+  const bdeDisplayEmail = {};
+
+  const ensureBdeEntry = (email) => {
+    const key = normEmail(email);
+    if (!key) return;
+    if (!bdeMap[key]) {
+      bdeMap[key] = { tokens: [], full: [] };
+      bdeDisplayEmail[key] = email;
+    }
+  };
+
   tokenData.forEach(r => {
     if (!r.bdMail) return;
-    if (!bdeMap[r.bdMail]) bdeMap[r.bdMail] = { tokens: [], full: [] };
-    bdeMap[r.bdMail].tokens.push(r);
+    ensureBdeEntry(r.bdMail);
+    bdeMap[normEmail(r.bdMail)].tokens.push(r);
   });
   fullData.forEach(r => {
     if (!r.bdMail) return;
-    if (!bdeMap[r.bdMail]) bdeMap[r.bdMail] = { tokens: [], full: [] };
-    bdeMap[r.bdMail].full.push(r);
+    ensureBdeEntry(r.bdMail);
+    bdeMap[normEmail(r.bdMail)].full.push(r);
   });
-  Object.keys(bdeMap).sort().forEach(bd => {
-    const tAgg = revAggTokens(bdeMap[bd].tokens);
-    const fAgg = revAggFull(bdeMap[bd].full);
+
+  if (bdTargetLoaded) {
+    const { start: fStart, end: fEnd } = revGetFilterDateRange();
+    const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+    bdTargetRows.forEach(row => {
+      const email = row.agentEmail;
+      if (!email) return;
+      if (progFilter && row.programName !== progFilter) return;
+      if (activeFilters.tl !== 'ALL' && !normTlMatch(row.managerName, activeFilters.tl)) return;
+      if (activeFilters.gm !== 'ALL' && normTeamName(row.gmName) !== normTeamName(activeFilters.gm)) return;
+      if (activeFilters.gm === 'ALL' && row.gmName && !isGMAllowed(row.gmName)) return;
+      if (activeFilters.bde !== 'ALL' && normEmail(email) !== normEmail(activeFilters.bde)) return;
+      if (!row.startDate || !row.endDate) return;
+      if (fEnd < row.startDate || fStart > row.endDate) return;
+      ensureBdeEntry(email);
+    });
+  }
+
+  Object.keys(bdeMap).sort().forEach(key => {
+    const bd = bdeDisplayEmail[key] || key;
+    const tAgg = revAggTokens(bdeMap[key].tokens);
+    const fAgg = revAggFull(bdeMap[key].full);
     const { total: bdeTarget, perDay: bdeTargetDay } = revBdSheetTarget(bd);
+    const { deficit: bdeDeficit } = revBdCurrentDeficit(bd);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-name bold" title="${bd}">${bd}</td>
       ${targetCellHtml(bdeTarget, bdeTargetDay)}
-      <td class="col-num">${fNum(tAgg.count)}</td>
-      <td class="col-num">${fNum(fAgg.count)}</td>
+      <td class="col-num">${tAgg.count > 0 ? fNum(tAgg.count) : '—'}</td>
+      <td class="col-num">${fAgg.count > 0 ? fNum(fAgg.count) : '—'}</td>
+      <td class="col-num">${bdeDeficit > 0 ? formatTargetNum(bdeDeficit) : '—'}</td>
     `;
     bdaTbody.appendChild(tr);
   });
-  if (bdaTbody.innerHTML === '') emptyRow(bdaTbody, 4);
+  if (bdaTbody.innerHTML === '') emptyRow(bdaTbody, 5);
 
   // Date-wise Token & Enrollment
   const dateTbody = document.getElementById('rev-date-table');
