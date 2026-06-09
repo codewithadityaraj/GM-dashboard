@@ -611,6 +611,7 @@ function initDashboard() {
   // Sidebar user info
   document.getElementById('sidebar-avatar').textContent = userDisplayName.charAt(0).toUpperCase();
   document.getElementById('sidebar-username').textContent = userDisplayName;
+  updateSidebarUserRole(userDisplayName);
 
   renderSidebarTeam();
 
@@ -881,6 +882,7 @@ function applyFilters() {
       document.getElementById('gm-dashboard-label').textContent = gmLabel + "'s Dashboard";
       document.getElementById('sidebar-avatar').textContent = avatarChar;
       document.getElementById('sidebar-username').textContent = gmLabel;
+      updateSidebarUserRole(gmLabel);
     } else if (activeFilters.program !== prevProgram) {
       activeFilters.tl = 'ALL';
       activeFilters.bde = 'ALL';
@@ -2738,7 +2740,7 @@ function prodAggregate(rows) {
 function prodCalendarWorkingDaysExclSunday(dateFrom, dateTo) {
   if (!dateFrom || !dateTo) return 0;
   const start = new Date(dateFrom + 'T00:00:00');
-  const end   = new Date(dateTo + 'T00:00:00');
+  const end = new Date(dateTo + 'T00:00:00');
   if (end < start) return 0;
   let count = 0;
   const d = new Date(start);
@@ -4302,3 +4304,18 @@ document.addEventListener('click', (event) => {
     closeCustomDatePopup(false);
   }
 });
+
+function updateSidebarUserRole(name) {
+  const el = document.getElementById('sidebar-userrole');
+  if (!el) return;
+  const normName = (name || '').toLowerCase().trim();
+  if (normName === 'syed') {
+    el.textContent = 'Head of Business';
+  } else if (normName === 'anshul') {
+    el.textContent = 'Associate Director - Sales';
+  } else if (normName === 'rekha') {
+    el.textContent = 'Assistant General Manager';
+  } else {
+    el.textContent = 'General Manager';
+  }
+}
