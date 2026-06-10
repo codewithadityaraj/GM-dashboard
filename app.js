@@ -1300,14 +1300,25 @@ function revProgramsInScope(contextRows) {
 
 // Target scoped to active GM / TL / BDE filters (KPI + unit cards)
 function revScopedTarget(contextRows) {
-  if (!cohortLoaded) return { total: 0, perDay: 0 };
+  if (activeFilters.tl !== 'ALL') {
+    if (!tlTargetLoaded) return { total: 0, perDay: 0 };
+    const programs = revProgramsInScope(contextRows);
+    if (programs.length === 1) {
+      return revTlSheetTarget(activeFilters.tl, programs[0]);
+    }
+    return revTlSheetTarget(activeFilters.tl);
+  }
 
   if (activeFilters.bde !== 'ALL') {
-    return revBdaRowsCohortTarget(contextRows);
+    if (!bdTargetLoaded) return { total: 0, perDay: 0 };
+    const programs = revProgramsInScope(contextRows);
+    if (programs.length === 1) {
+      return revBdSheetTarget(activeFilters.bde, programs[0]);
+    }
+    return revBdSheetTarget(activeFilters.bde);
   }
-  if (activeFilters.tl !== 'ALL') {
-    return revTlRowsCohortTarget(activeFilters.tl);
-  }
+
+  if (!cohortLoaded) return { total: 0, perDay: 0 };
   if (activeFilters.gm !== 'ALL') {
     return revRowsCohortTarget(contextRows, activeFilters.gm);
   }
@@ -1613,8 +1624,8 @@ function revGmCurrentDeficit(gmName) {
   return { deficit };
 }
 
-// TL Performance table: TL TARGET sheet via Manager Name → TL Name
-function revTlSheetTarget(tlName) {
+// TL Performance table: TL TARGET sheet → Month Enrollment Target
+function revTlSheetTarget(tlName, programName) {
   if (!tlTargetLoaded || !tlName) return { total: 0, perDay: 0 };
 
   const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
@@ -1624,6 +1635,7 @@ function revTlSheetTarget(tlName) {
 
   tlTargetRows.forEach(row => {
     if (!normTlMatch(row.managerName, tlName)) return;
+    if (programName && row.programName !== programName) return;
     if (progFilter && row.programName !== progFilter) return;
     const r = calculateBdEnrollmentTarget(
       row.monthEnrollmentTarget,
@@ -1637,6 +1649,63 @@ function revTlSheetTarget(tlName) {
   });
 
   return { total, perDay };
+}
+
+// Target Token (Unit wise): TL TARGET sheet → Month Token Target
+function revTlSheetTokenTarget(tlName, programName) {
+  if (!tlTargetLoaded || !tlName) return { total: 0, perDay: 0 };
+
+  const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+  const { start, end } = revGetFilterDateRange();
+  let total = 0;
+  let perDay = 0;
+
+  tlTargetRows.forEach(row => {
+    if (!normTlMatch(row.managerName, tlName)) return;
+    if (programName && row.programName !== programName) return;
+    if (progFilter && row.programName !== progFilter) return;
+    const r = calculateBdEnrollmentTarget(
+      row.monthTokenTarget,
+      row.startDate,
+      row.endDate,
+      start,
+      end,
+    );
+    total += r.target;
+    perDay += r.perDay;
+  });
+
+  return { total, perDay };
+}
+
+function revTlProgramsInScope(tlName) {
+  if (!tlTargetLoaded || !tlName) return [];
+  const { start, end } = revGetFilterDateRange();
+  const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+  const programs = new Set();
+
+  tlTargetRows.forEach(row => {
+    if (!normTlMatch(row.managerName, tlName)) return;
+    if (progFilter && row.programName !== progFilter) return;
+    if (!row.programName || !row.startDate || !row.endDate) return;
+    if (end < row.startDate || start > row.endDate) return;
+    programs.add(row.programName);
+  });
+
+  return [...programs].sort();
+}
+
+function findTlTargetRow(tlName, programName) {
+  if (!tlTargetLoaded || !tlName || !programName) return null;
+  const { start, end } = revGetFilterDateRange();
+  const matches = tlTargetRows.filter(row => {
+    if (!normTlMatch(row.managerName, tlName)) return false;
+    if (row.programName !== programName) return false;
+    if (!row.startDate || !row.endDate) return false;
+    if (end < row.startDate || start > row.endDate) return false;
+    return true;
+  });
+  return matches[0] || null;
 }
 
 // TL past-period enrollment deficit before filter start (cohortStart → filterStart-1)
@@ -1668,8 +1737,8 @@ function revTlCurrentDeficit(tlName) {
   return { deficit };
 }
 
-// BDA Performance table: BD TARGET sheet via Agent Email ID → BD Mail
-function revBdSheetTarget(email) {
+// BDA Performance table: BD TARGET sheet → Month Enrollment Target
+function revBdSheetTarget(email, programName) {
   if (!bdTargetLoaded) return { total: 0, perDay: 0 };
 
   const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
@@ -1679,6 +1748,7 @@ function revBdSheetTarget(email) {
   let perDay = 0;
 
   matches.forEach(row => {
+    if (programName && row.programName !== programName) return;
     if (progFilter && row.programName !== progFilter) return;
     const r = calculateBdEnrollmentTarget(
       row.monthEnrollmentTarget,
@@ -1692,6 +1762,61 @@ function revBdSheetTarget(email) {
   });
 
   return { total, perDay };
+}
+
+// Target Token (Unit wise): BD TARGET sheet → Month Token Target
+function revBdSheetTokenTarget(email, programName) {
+  if (!bdTargetLoaded) return { total: 0, perDay: 0 };
+
+  const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+  const { start, end } = revGetFilterDateRange();
+  const matches = bdTargetRowsForEmail(email);
+  let total = 0;
+  let perDay = 0;
+
+  matches.forEach(row => {
+    if (programName && row.programName !== programName) return;
+    if (progFilter && row.programName !== progFilter) return;
+    const r = calculateBdEnrollmentTarget(
+      row.monthTokenTarget,
+      row.startDate,
+      row.endDate,
+      start,
+      end,
+    );
+    total += r.target;
+    perDay += r.perDay;
+  });
+
+  return { total, perDay };
+}
+
+function revBdProgramsInScope(email) {
+  if (!bdTargetLoaded || !email) return [];
+  const { start, end } = revGetFilterDateRange();
+  const progFilter = activeFilters.program !== 'ALL' ? activeFilters.program : '';
+  const programs = new Set();
+
+  bdTargetRowsForEmail(email).forEach(row => {
+    if (progFilter && row.programName !== progFilter) return;
+    if (!row.programName || !row.startDate || !row.endDate) return;
+    if (end < row.startDate || start > row.endDate) return;
+    programs.add(row.programName);
+  });
+
+  return [...programs].sort();
+}
+
+function findBdTargetRow(email, programName) {
+  if (!bdTargetLoaded || !email || !programName) return null;
+  const { start, end } = revGetFilterDateRange();
+  const matches = bdTargetRowsForEmail(email).filter(row => {
+    if (row.programName !== programName) return false;
+    if (!row.startDate || !row.endDate) return false;
+    if (end < row.startDate || start > row.endDate) return false;
+    return true;
+  });
+  return matches[0] || null;
 }
 
 // BDA past-period enrollment deficit before filter start (cohortStart → filterStart-1)
@@ -2197,6 +2322,12 @@ function renderRevenue() {
     ...tokenData.map(r => r.type).filter(Boolean),
     ...fullData.map(r => r.type).filter(Boolean)
   ]);
+  if (activeFilters.tl !== 'ALL') {
+    revTlProgramsInScope(activeFilters.tl).forEach(p => typeSet.add(p));
+  }
+  if (activeFilters.bde !== 'ALL') {
+    revBdProgramsInScope(activeFilters.bde).forEach(p => typeSet.add(p));
+  }
   const types = [...typeSet].sort();
   if (types.length === 0 && activeFilters.program !== 'ALL') {
     types.push(activeFilters.program);
@@ -2207,10 +2338,28 @@ function renderRevenue() {
     const fRows = fullData.filter(r => r.type === type);
     const tAgg = revAggTokens(tRows);
     const fAgg = revAggFull(fRows);
-    const cohort = findCohortTarget(type);
-    const { total: rawProgTarget, perDay: rawProgPerDay } = revScopedTarget([...tRows, ...fRows]);
-    const progTarget = Math.ceil(rawProgTarget);
-    const progPerDay = Math.ceil(rawProgPerDay);
+    const tlTargetRow = activeFilters.tl !== 'ALL' ? findTlTargetRow(activeFilters.tl, type) : null;
+    const bdTargetRow = activeFilters.bde !== 'ALL' ? findBdTargetRow(activeFilters.bde, type) : null;
+    const cohort = bdTargetRow || tlTargetRow || findCohortTarget(type);
+    let rawTokenTarget = 0;
+    let rawTokenPerDay = 0;
+    let rawEnrollTarget = 0;
+    let rawEnrollPerDay = 0;
+    if (activeFilters.tl !== 'ALL') {
+      ({ total: rawTokenTarget, perDay: rawTokenPerDay } = revTlSheetTokenTarget(activeFilters.tl, type));
+      ({ total: rawEnrollTarget, perDay: rawEnrollPerDay } = revTlSheetTarget(activeFilters.tl, type));
+    } else if (activeFilters.bde !== 'ALL') {
+      ({ total: rawTokenTarget, perDay: rawTokenPerDay } = revBdSheetTokenTarget(activeFilters.bde, type));
+      ({ total: rawEnrollTarget, perDay: rawEnrollPerDay } = revBdSheetTarget(activeFilters.bde, type));
+    } else {
+      ({ total: rawEnrollTarget, perDay: rawEnrollPerDay } = revScopedTarget([...tRows, ...fRows]));
+      rawTokenTarget = rawEnrollTarget;
+      rawTokenPerDay = rawEnrollPerDay;
+    }
+    const progTarget = Math.ceil(rawTokenTarget);
+    const progPerDay = Math.ceil(rawTokenPerDay);
+    const enrollTarget = Math.ceil(rawEnrollTarget);
+    const enrollPerDay = Math.ceil(rawEnrollPerDay);
     const cohortDates = cohort ? `${cohort.startDate} → ${cohort.endDate}` : '';
     const accentClass = idx % 3 === 0 ? 'accent-indigo' : idx % 3 === 1 ? 'accent-emerald' : 'accent-purple';
 
@@ -2240,7 +2389,7 @@ function renderRevenue() {
 
     // 2. Populate Full Enrollment target card
     if (enrollmentUnitsContainer) {
-      const fullPct = progTarget ? Math.min(100, (fAgg.count / progTarget) * 100) : 0;
+      const fullPct = enrollTarget ? Math.min(100, (fAgg.count / enrollTarget) * 100) : 0;
       const card = document.createElement('div');
       card.className = `target-card ${accentClass}`;
       card.innerHTML = `
@@ -2249,13 +2398,13 @@ function renderRevenue() {
           <span class="target-card-sub">Enrollments Value: ${fCurrency(fAgg.amount)}${cohortDates ? ` · ${cohortDates}` : ''}</span>
         </div>
         <div class="target-progress-wrap">
-          ${progTarget ? `
+          ${enrollTarget ? `
           <div class="target-progress-bar">
             <div class="target-progress-fill" style="width: ${fullPct.toFixed(1)}%"></div>
           </div>` : ''}
           <div class="target-progress-stats">
             <span>Achieved: ${fAgg.count} Full</span>
-            <span>Target: ${formatTargetNum(progTarget)} (${formatTargetNum(progPerDay)}/day) · Progress: ${fullPct.toFixed(1)}%</span>
+            <span>Target: ${formatTargetNum(enrollTarget)} (${formatTargetNum(enrollPerDay)}/day) · Progress: ${fullPct.toFixed(1)}%</span>
           </div>
         </div>
       `;
