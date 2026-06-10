@@ -1054,7 +1054,7 @@ function renderOverview() {
     setText('ov-avg-talktime', '…');
   }
 
-  // 8. Total Lead (CVR) & 9. Duration Total Lead (CVR)
+  // 8. Total Lead (CVR) & 9. Current Leads (CVR)
   if (laLoaded) {
     const durationLeads = getBaseLAData();
     const durationLeadsCount = durationLeads.length;
