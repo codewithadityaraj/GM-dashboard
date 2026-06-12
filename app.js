@@ -54,6 +54,11 @@ const GM_USERS = {
     displayName: 'Syed',
     access: 'ALL'
   },
+  melwyn: {
+    password: 'melwyn@4098',
+    displayName: 'Melwyn',
+    access: 'ALL'
+  },
   anshul: {
     password: 'Anshul@4241',
     displayName: 'Anshul',
@@ -3864,7 +3869,7 @@ function renderLeadAnalysis() {
 
   const campaignCard = document.getElementById('la-campaign-table-card');
   if (campaignCard) {
-    if (currentUser === 'syed') {
+    if (currentUser === 'syed' || currentUser === 'melwyn') {
       campaignCard.style.display = 'block';
     } else {
       campaignCard.style.display = 'none';
@@ -4485,7 +4490,7 @@ function updateSidebarUserRole(name) {
   const el = document.getElementById('sidebar-userrole');
   if (!el) return;
   const normName = (name || '').toLowerCase().trim();
-  if (normName === 'syed') {
+  if (normName === 'syed' || normName === 'melwyn') {
     el.textContent = 'Head of Business';
   } else if (normName === 'anshul') {
     el.textContent = 'Associate Director - Sales';
