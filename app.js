@@ -69,20 +69,10 @@ const GM_USERS = {
     displayName: 'Siddhartha',
     access: ['Siddhartha']
   },
-  siddharth: {
-    password: 'Siddharth@3543',
-    displayName: 'Siddhartha',
-    access: ['Siddhartha']
-  },
   rekha: {
     password: 'Rekha@4524',
     displayName: 'Rekha',
     access: ['Rekha']
-  },
-  shringarika: {
-    password: 'Shringarika@4324',
-    displayName: 'Shringarika',
-    access: ['Shringarika']
   },
   umang: {
     password: 'Umang@y6362',
@@ -94,11 +84,6 @@ const GM_USERS = {
     displayName: 'Sowmya',
     access: ['Sowmya']
   },
-  anshuman: {
-    password: 'Anshuman@4655',
-    displayName: 'Anshuman',
-    access: ['Anshuman']
-  },
   kavish: {
     password: 'Kavish@6463',
     displayName: 'Kavish',
@@ -108,7 +93,12 @@ const GM_USERS = {
     password: 'Ajay@8248',
     displayName: 'Ajay',
     access: ['Ajay']
-  }
+  },
+  sid: {
+    password: 'sid@4141',
+    displayName: 'Sid',
+    access: ['Kavish', 'Sowmya', 'Siddhartha']
+  },
 };
 
 function getAllowedGMs() {
@@ -125,7 +115,7 @@ function getAllowedGMs() {
       revFullRows.forEach(r => { if (r.gm) gms.add(r.gm); });
     }
     if (gms.size === 0) {
-      return ['Anshul', 'Umang', 'Anshuman', 'Rekha', 'Kavish', 'Siddhartha', 'Sowmya', 'Shringarika', 'Ajay'];
+      return ['Anshul', 'Umang', 'Rekha', 'Kavish', 'Siddhartha', 'Sowmya', 'Ajay', 'Sid'];
     }
     allowedGMsCache = [...gms].sort();
     return allowedGMsCache;
